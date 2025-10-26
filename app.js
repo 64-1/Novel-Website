@@ -14,7 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const fontSlider = document.querySelector('input[data-action="font-size"]');
   const lineSlider = document.querySelector('input[data-action="line-height"]');
   const readerThemeButtons = document.querySelectorAll(".theme-toggle .pill");
-  const tocItems = document.querySelectorAll(".toc li");
+  const tocList = document.querySelector(".toc ol");
+  let tocItems = [];
   const readerProgressBar = document.querySelector('[data-progress="reader"]');
   const readerProgressFill = readerProgressBar?.querySelector(".progress-fill");
   const readerModal = document.getElementById("reader-modal");
@@ -23,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalCloseElements = readerModal ? readerModal.querySelectorAll('[data-action="close-modal"]') : [];
   const modalProgressBar = document.querySelector('[data-progress="modal"]');
   const modalProgressFill = modalProgressBar?.querySelector(".progress-fill");
+  const modalContent = readerModal ? readerModal.querySelector(".modal-content") : null;
   const tabs = document.querySelectorAll(".writer-tabs .tab");
   const panels = document.querySelectorAll(".writer-panels .panel");
   const noteList = document.querySelector(".note-list");
@@ -49,16 +51,28 @@ document.addEventListener("DOMContentLoaded", () => {
   let autosaveTimer = null;
   let lastSavedSnapshot = "";
   const AUTOSAVE_DELAY = 1000;
+  let lastFocusedElement = null;
+  let focusTrapListener = null;
+  let focusableModalElements = [];
+  let firstModalFocusable = null;
+  let lastModalFocusable = null;
+  const FOCUSABLE_SELECTOR =
+    'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
-  // LocalStorage keys for per-chapter reading progress
+  if (modalContent && !modalContent.hasAttribute("tabindex")) {
+    modalContent.setAttribute("tabindex", "-1");
+  }
+
+  // LocalStorage keys for per-chapter reading progress (slug-based)
   const STORAGE_KEYS = {
     reader: (id) => `progress:${id}`,
     modal: (id) => `progress:modal:${id}`
   };
 
-  const chapters = [
+  const fallbackChapters = [
     {
       id: "chapter-12",
+      slug: "lightfall-ode",
       title: "第十二章 · 光落之歌",
       summary: "黎川在浮城的晨光中迎接新的讯息，面对即将到来的记忆回廊。",
       paragraphs: [
@@ -75,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     {
       id: "chapter-13",
+      slug: "tide-echoes",
       title: "第十三章 · 海浪回音",
       summary: "浮城外海的隐秘实验室暴露更多真相，夏茗与黎川的过往也渐渐浮现。",
       paragraphs: [
@@ -90,6 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     {
       id: "chapter-14",
+      slug: "nocturne-resonance",
       title: "第十四章 · 静夜共鸣",
       summary: "记忆回廊开启前夜，浮城的灯火下，各自的心声交汇成新的共鸣。",
       paragraphs: [
@@ -104,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ]
     }
   ];
+  let chapters = [];
 
   const readerSettings = loadReaderSettings();
   applyReaderSettings();
@@ -122,13 +139,11 @@ document.addEventListener("DOMContentLoaded", () => {
     context: "modal"
   });
 
-  renderChapter(currentChapterIndex);
-  highlightToc(currentChapterIndex);
-  setupModalContents();
   initialiseShellTheme();
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
+  initChapters();
 
   // ---------- Theme & Shell ----------
   themeToggleBtn?.addEventListener("click", () => {
@@ -149,6 +164,91 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateShellThemeButton(mode) {
     if (!themeToggleBtn) return;
     themeToggleBtn.textContent = mode === "dark" ? "日间模式" : "夜间模式";
+  }
+
+  async function initChapters() {
+    const remoteChapters = await loadChaptersFromJson();
+    const normalizedFallback = fallbackChapters.map((chapter, index) => normalizeChapter(chapter, index)).filter(Boolean);
+    const normalizedRemote = remoteChapters.length
+      ? remoteChapters
+      : [];
+    chapters = normalizedRemote.length ? normalizedRemote : normalizedFallback;
+
+    if (!chapters.length) {
+      console.warn("未找到任何章节数据。");
+      return;
+    }
+
+    renderToc();
+    setupModalContents();
+    currentChapterIndex = Math.min(currentChapterIndex, chapters.length - 1);
+    selectChapter(currentChapterIndex);
+  }
+
+  async function loadChaptersFromJson() {
+    try {
+      const response = await fetch("chapters.json", { cache: "no-cache" });
+      if (!response.ok) {
+        throw new Error(`请求失败: ${response.status}`);
+      }
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error("章节数据格式无效，需要数组。");
+      }
+      return data.map((chapter, index) => normalizeChapter(chapter, index)).filter(Boolean);
+    } catch (error) {
+      console.warn("加载章节 JSON 失败，使用内置章节。", error);
+      return [];
+    }
+  }
+
+  function normalizeChapter(raw, index) {
+    if (!raw || typeof raw !== "object") return null;
+    const id =
+      typeof raw.id === "string" && raw.id.trim()
+        ? raw.id.trim()
+        : `chapter-${index + 1}`;
+    const slugSource =
+      typeof raw.slug === "string" && raw.slug.trim()
+        ? raw.slug.trim()
+        : id;
+    const slug = slugSource.replace(/\s+/g, "-");
+    const title =
+      typeof raw.title === "string" && raw.title.trim()
+        ? raw.title.trim()
+        : `章节 ${index + 1}`;
+    const summary =
+      typeof raw.summary === "string" ? raw.summary.trim() : "";
+    const paragraphs = Array.isArray(raw.paragraphs)
+      ? raw.paragraphs
+          .map((paragraph) => normalizeParagraph(paragraph))
+          .filter((paragraph) => paragraph !== null)
+      : [];
+
+    return {
+      id,
+      slug,
+      title,
+      summary,
+      paragraphs
+    };
+  }
+
+  function normalizeParagraph(entry) {
+    if (typeof entry === "string") {
+      return entry;
+    }
+    if (entry && typeof entry === "object") {
+      if (entry.type === "blockquote") {
+        const text = typeof entry.text === "string" ? entry.text : "";
+        if (!text) return null;
+        return { type: "blockquote", text };
+      }
+      if (typeof entry.text === "string") {
+        return entry.text;
+      }
+    }
+    return null;
   }
 
   // ---------- Smooth scroll ----------
@@ -189,12 +289,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  tocItems.forEach((item, index) => {
-    item.addEventListener("click", () => {
-      selectChapter(index);
-    });
-  });
-
   readerLayoutBtn?.addEventListener("click", () => {
     readerGrid?.classList.toggle("expanded");
     readerLayoutBtn.classList.toggle("active");
@@ -204,10 +298,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   openReaderBtn?.addEventListener("click", () => {
     if (!readerModal) return;
+    lastFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     readerModal.classList.add("active");
+    readerModal.setAttribute("aria-hidden", "false");
     syncModalTheme();
     modalProgressTracker?.refresh({ fromStorage: true });
     document.documentElement.style.overflow = "hidden";
+    activateFocusTrap();
+    requestAnimationFrame(() => focusFirstModalElement());
   });
 
   modalCloseElements.forEach((element) => {
@@ -222,16 +321,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && readerModal?.classList.contains("active")) {
-      closeModal();
-    }
-  });
+  document.addEventListener("keydown", handleGlobalKeydown);
 
   function closeModal() {
     if (!readerModal) return;
     readerModal.classList.remove("active");
+    readerModal.setAttribute("aria-hidden", "true");
     document.documentElement.style.overflow = "";
+    deactivateFocusTrap();
+    restoreFocus();
   }
 
   function loadReaderSettings() {
@@ -271,77 +369,115 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function selectChapter(index) {
-    currentChapterIndex = index;
-    renderChapter(index);
-    renderChapter(index, modalArticle);
-    highlightToc(index);
-    updateModalList(index);
+    if (!chapters.length) return;
+    const safeIndex = Math.max(0, Math.min(index, chapters.length - 1));
+    currentChapterIndex = safeIndex;
+    renderChapter(safeIndex);
+    renderChapter(safeIndex, modalArticle);
+    highlightToc(safeIndex);
+    updateModalList(safeIndex);
     syncModalTheme();
   }
 
   function renderChapter(index, target = readerContent) {
     const chapter = chapters[index];
     if (!chapter || !target) return;
+    const slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
     target.innerHTML = "";
     const title = document.createElement("h3");
     title.textContent = chapter.title;
     target.appendChild(title);
+
+    if (target === modalArticle && chapter.summary) {
+      const summary = document.createElement("p");
+      summary.className = "chapter-summary";
+      summary.textContent = chapter.summary;
+      target.appendChild(summary);
+    }
 
     chapter.paragraphs.forEach((paragraph) => {
       if (typeof paragraph === "string") {
         const p = document.createElement("p");
         p.textContent = paragraph;
         target.appendChild(p);
-      } else if (paragraph.type === "blockquote") {
+      } else if (paragraph && paragraph.type === "blockquote") {
         const block = document.createElement("blockquote");
         block.textContent = paragraph.text;
         target.appendChild(block);
       }
     });
 
-    if (target === modalArticle) {
-      const summary = document.createElement("p");
-      summary.className = "chapter-summary";
-      summary.textContent = chapter.summary;
-      target.insertBefore(summary, target.children[1] || null);
-    }
-
     if (target === readerContent) {
-      readerProgressTracker?.onChapterRendered(chapter.id);
+      readerProgressTracker?.onChapterRendered(slug);
     }
 
     if (target === modalArticle) {
-      modalProgressTracker?.onChapterRendered(chapter.id);
+      modalProgressTracker?.onChapterRendered(slug);
     }
+
+    refreshFocusTrapElements();
+  }
+
+  function renderToc() {
+    if (!tocList) return;
+    tocList.innerHTML = "";
+    chapters.forEach((chapter, index) => {
+      const item = document.createElement("li");
+      item.textContent = chapter.title;
+      item.dataset.slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
+      item.addEventListener("click", () => selectChapter(index));
+      tocList.appendChild(item);
+    });
+    tocItems = Array.from(tocList.querySelectorAll("li"));
+    refreshFocusTrapElements();
   }
 
   function highlightToc(index) {
     tocItems.forEach((item, idx) => {
-      item.classList.toggle("active", idx === index);
+      const isActive = idx === index;
+      item.classList.toggle("active", isActive);
+      if (isActive) {
+        item.setAttribute("aria-current", "true");
+      } else {
+        item.removeAttribute("aria-current");
+      }
     });
   }
 
   function setupModalContents() {
     if (!modalArticle || !modalToc) return;
     modalArticle.dataset.theme = readerSettings.theme;
+    modalToc.innerHTML = "";
     const list = document.createElement("ol");
     chapters.forEach((chapter, index) => {
       const item = document.createElement("li");
+      const isActive = index === currentChapterIndex;
       item.textContent = chapter.title;
-      item.className = index === currentChapterIndex ? "active" : "";
+      item.dataset.slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
+      if (isActive) {
+        item.classList.add("active");
+        item.setAttribute("aria-current", "true");
+      }
       item.addEventListener("click", () => selectChapter(index));
       list.appendChild(item);
     });
     modalToc.appendChild(list);
-    renderChapter(currentChapterIndex, modalArticle);
     updateModalList(currentChapterIndex);
+    refreshFocusTrapElements();
   }
 
   function updateModalList(index) {
     if (!modalToc) return;
     modalToc.querySelectorAll("li").forEach((li, idx) => {
-      li.classList.toggle("active", idx === index);
+      const isActive = idx === index;
+      li.classList.toggle("active", isActive);
+      if (isActive) {
+        li.setAttribute("aria-current", "true");
+      } else {
+        li.removeAttribute("aria-current");
+      }
     });
+    refreshFocusTrapElements();
   }
 
   function syncModalTheme() {
@@ -350,10 +486,161 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function activateFocusTrap() {
+    if (!readerModal) return;
+    updateFocusTrapElements();
+    if (!focusTrapListener) {
+      focusTrapListener = (event) => handleFocusTrapKeydown(event);
+      readerModal.addEventListener("keydown", focusTrapListener);
+    }
+  }
+
+  function deactivateFocusTrap() {
+    if (readerModal && focusTrapListener) {
+      readerModal.removeEventListener("keydown", focusTrapListener);
+    }
+    focusTrapListener = null;
+    focusableModalElements = [];
+    firstModalFocusable = null;
+    lastModalFocusable = null;
+  }
+
+  function updateFocusTrapElements() {
+    const container = modalContent || readerModal;
+    focusableModalElements = getFocusableElements(container);
+    firstModalFocusable = focusableModalElements[0] || null;
+    lastModalFocusable = focusableModalElements[focusableModalElements.length - 1] || null;
+  }
+
+  function refreshFocusTrapElements() {
+    if (readerModal?.classList.contains("active")) {
+      updateFocusTrapElements();
+    }
+  }
+
+  function focusFirstModalElement() {
+    updateFocusTrapElements();
+    if (firstModalFocusable) {
+      firstModalFocusable.focus({ preventScroll: true });
+    } else if (modalContent) {
+      modalContent.focus({ preventScroll: true });
+    }
+  }
+
+  function restoreFocus() {
+    const focusTarget =
+      lastFocusedElement && typeof lastFocusedElement.focus === "function"
+        ? lastFocusedElement
+        : openReaderBtn;
+    if (focusTarget && typeof focusTarget.focus === "function") {
+      focusTarget.focus({ preventScroll: true });
+    }
+    lastFocusedElement = null;
+  }
+
+  function handleFocusTrapKeydown(event) {
+    if (event.key !== "Tab") return;
+    updateFocusTrapElements();
+    if (!focusableModalElements.length) {
+      event.preventDefault();
+      if (modalContent) {
+        modalContent.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (event.shiftKey) {
+      if (activeElement === firstModalFocusable || !focusableModalElements.includes(activeElement)) {
+        event.preventDefault();
+        (lastModalFocusable || firstModalFocusable).focus({ preventScroll: true });
+      }
+    } else {
+      if (activeElement === lastModalFocusable) {
+        event.preventDefault();
+        (firstModalFocusable || lastModalFocusable).focus({ preventScroll: true });
+      }
+    }
+  }
+
+  function getFocusableElements(container) {
+    if (!container) return [];
+    const elements = Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR));
+    return elements.filter(
+      (element) =>
+        !element.hasAttribute("disabled") &&
+        element.getAttribute("aria-hidden") !== "true" &&
+        isElementVisible(element)
+    );
+  }
+
+  function isElementVisible(element) {
+    return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    const target = event.target;
+    const tagName = target?.tagName;
+    if (
+      target &&
+      (target.isContentEditable || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT")
+    ) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (readerModal?.classList.contains("active")) {
+        event.preventDefault();
+        closeModal();
+      }
+      return;
+    }
+
+    if (!chapters.length) return;
+
+    switch (event.key) {
+      case "ArrowRight":
+        if (currentChapterIndex < chapters.length - 1) {
+          event.preventDefault();
+          selectChapter(currentChapterIndex + 1);
+        }
+        break;
+      case "ArrowLeft":
+        if (currentChapterIndex > 0) {
+          event.preventDefault();
+          selectChapter(currentChapterIndex - 1);
+        }
+        break;
+      case "j":
+      case "J":
+        event.preventDefault();
+        scrollActiveContainer("down");
+        break;
+      case "k":
+      case "K":
+        event.preventDefault();
+        scrollActiveContainer("up");
+        break;
+      default:
+        break;
+    }
+  }
+
+  function scrollActiveContainer(direction) {
+    const container = readerModal?.classList.contains("active") && modalArticle ? modalArticle : readerContent;
+    if (!container) return;
+    const amount = Math.max(container.clientHeight * 0.9, 200);
+    const offset = direction === "down" ? amount : -amount;
+    container.scrollBy({ top: offset, behavior: "smooth" });
+  }
+
   function createProgressTracker({ container, progressBar, progressFill, context }) {
     if (!container || !progressBar || !progressFill) return null;
 
-    let chapterId = null;
+    let chapterSlug = null;
     let storedProgress = 0;
     let lastRun = 0;
     let trailingTimeout = null;
@@ -433,9 +720,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    function getStorageKey(id = chapterId) {
-      if (!id) return null;
-      return context === "modal" ? STORAGE_KEYS.modal(id) : STORAGE_KEYS.reader(id);
+    function getStorageKey(slug = chapterSlug) {
+      if (!slug) return null;
+      const sanitizedSlug = String(slug).trim();
+      if (!sanitizedSlug) return null;
+      return context === "modal" ? STORAGE_KEYS.modal(sanitizedSlug) : STORAGE_KEYS.reader(sanitizedSlug);
     }
 
     function readStoredProgress() {
@@ -462,8 +751,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    function onChapterRendered(id) {
-      chapterId = id;
+    function onChapterRendered(slug) {
+      chapterSlug = slug;
       storedProgress = readStoredProgress();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
