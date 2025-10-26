@@ -659,6 +659,17 @@ document.addEventListener("DOMContentLoaded", () => {
     container.scrollBy({ top: offset, behavior: "smooth" });
   }
 
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) {
+      return;
+    }
+    navigator.serviceWorker
+      .register("service-worker.js")
+      .catch((error) => {
+        console.warn("Service worker registration failed:", error);
+      });
+  }
+
   function createProgressTracker({ container, progressBar, progressFill, context }) {
     if (!container || !progressBar || !progressFill) return null;
 
@@ -1140,4 +1151,6 @@ document.addEventListener("DOMContentLoaded", () => {
       ideaToast.classList.remove("active");
     }, 2400);
   }
+
+  registerServiceWorker();
 });
