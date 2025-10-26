@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星海小说 | 沉浸式中文原创与阅读平台</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#home">
+        <span class="brand-logo">星</span>
+        星海小说
+      </a>
+      <nav class="primary-nav">
+        <a href="#discover">发现</a>
+        <a href="#reader">阅读体验</a>
+        <a href="#writer">创作者工具</a>
+        <a href="#community">灵感广场</a>
+      </nav>
+      <div class="header-actions">
+        <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
+        <button class="btn primary">开始创作</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <p class="highlight">沉浸式阅读，灵感自由流动</p>
+          <h1>专为中文原创打造的极致阅读与写作体验</h1>
+          <p class="subhead">
+            借鉴 Pixiv 小说的清爽质感，融合全屏沉浸阅读、智能排版与创作仪表盘，
+            给读者更舒适的长篇阅读旅程，也给作者更灵动的创作空间。
+          </p>
+          <div class="hero-actions">
+            <button class="btn primary" data-action="scroll" data-target="#reader">进入阅读空间</button>
+            <button class="btn secondary" data-action="scroll" data-target="#writer">探索创作工具</button>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-card">
+            <h3>晨光谱系 · 章节 12</h3>
+            <p>她在金色晨雾中醒来，窗外的浮岛缓缓移向远方——而他的心却在逐渐靠近。</p>
+            <div class="标签">
+              <span>科幻</span><span>群像</span><span>慢热</span>
+            </div>
+            <div class="progress">
+              <span>阅读进度</span>
+              <div class="progress-bar"><span style="width: 68%"></span></div>
+            </div>
+          </div>
+          <div class="hero-floating">
+            <div class="floating-card">
+              <p class="meta">今日创作热度</p>
+              <strong>12,480 字</strong>
+              <p class="meta">26 位作者正在更新</p>
+            </div>
+            <div class="floating-card">
+              <p class="meta">读者平均停留</p>
+              <strong>36 分钟</strong>
+              <p class="meta">舒适度评分 9.4 / 10</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="discover" id="discover">
+      <div class="container section-header">
+        <div>
+          <p class="eyebrow">精选宇宙</p>
+          <h2>用作品塑造自己的命名宇宙</h2>
+          <p class="section-subtitle">
+            精挑细选的中文原创故事，以主题胶囊卡呈现，快速找到共鸣的世界观。
+          </p>
+        </div>
+        <button class="btn ghost">查看全部合集</button>
+      </div>
+      <div class="container discovery-grid">
+        <article class="story-card accent-blue">
+          <div class="card-overlay"></div>
+          <div class="card-content">
+            <span class="tag">幻想史诗</span>
+            <h3>浮城纪年</h3>
+            <p>浮城与地表的千年对峙中，少年们试图改写命运。</p>
+            <div class="card-meta">
+              <span>连载 · 143,000 字</span>
+              <span>82,406 人收藏</span>
+            </div>
+          </div>
+        </article>
+        <article class="story-card accent-rose">
+          <div class="card-overlay"></div>
+          <div class="card-content">
+            <span class="tag">都市群像</span>
+            <h3>霓虹与海</h3>
+            <p>四个年轻人在夜色之城互相取暖，平行的人生轨迹交错。</p>
+            <div class="card-meta">
+              <span>完结 · 89,500 字</span>
+              <span>54,120 人收藏</span>
+            </div>
+          </div>
+        </article>
+        <article class="story-card accent-gold">
+          <div class="card-overlay"></div>
+          <div class="card-content">
+            <span class="tag">古风破案</span>
+            <h3>墨影录</h3>
+            <p>身负墨纹的捕快，破解潜藏在京城的千年秘密。</p>
+            <div class="card-meta">
+              <span>连载 · 67,200 字</span>
+              <span>31,255 人收藏</span>
+            </div>
+          </div>
+        </article>
+        <article class="story-card accent-violet">
+          <div class="card-overlay"></div>
+          <div class="card-content">
+            <span class="tag">软科幻</span>
+            <h3>晨光谱系</h3>
+            <p>探索星海的人们，在重构记忆的时代寻找真实的自我。</p>
+            <div class="card-meta">
+              <span>连载 · 210,300 字</span>
+              <span>96,013 人收藏</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="reader-lab" id="reader">
+      <div class="container section-header">
+        <div>
+          <p class="eyebrow">阅读实验室</p>
+          <h2>为长篇阅读打造的沉浸体验</h2>
+          <p class="section-subtitle">
+            自适应排版、渐进式章节导航、护眼配色与行距调节，把每一次阅读都变成舒展的呼吸。
+          </p>
+        </div>
+        <div class="reader-controls-top">
+          <button class="btn secondary" data-action="toggle-reader-layout">切换宽屏</button>
+          <button class="btn ghost" data-action="open-reader">全屏演示</button>
+        </div>
+      </div>
+      <div class="container reader-grid">
+        <aside class="toc">
+          <h4>章节目录</h4>
+          <ol>
+            <li class="active" data-chapter="0">第十二章 · 光落之歌</li>
+            <li data-chapter="1">第十三章 · 海浪回音</li>
+            <li data-chapter="2">第十四章 · 静夜共鸣</li>
+          </ol>
+          <div class="reader-stats">
+            <p>已读进度</p>
+            <div class="progress-bar slim" data-progress="reader" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="章节阅读进度">
+              <span class="progress-fill"></span>
+            </div>
+            <small>预计剩余阅读时间：12 分钟</small>
+          </div>
+        </aside>
+        <article class="reader-panel">
+          <header class="reader-toolbar">
+            <div class="toolbar-group">
+              <label>字号
+                <input type="range" min="16" max="24" value="18" data-action="font-size">
+              </label>
+              <label>行距
+                <input type="range" min="1.4" max="2" step="0.1" value="1.6" data-action="line-height">
+              </label>
+            </div>
+            <div class="toolbar-group theme-toggle">
+              <button class="pill active" data-theme="day">晨光</button>
+              <button class="pill" data-theme="dusk">暮色</button>
+              <button class="pill" data-theme="night">星夜</button>
+            </div>
+          </header>
+          <div class="reader-content" data-theme="day">
+            <h3>第十二章 · 光落之歌</h3>
+            <p>
+              清晨的雾气在浮城的边缘缓缓流淌，像是整个天空都在呼吸。黎川站在透明的观星台，
+              任由脚下的城市随着光线渐渐醒来。远处的漂浮群岛一点点靠近，像翻涌的云海中
+              漂浮的灯塔。
+            </p>
+            <p>
+              他把手掌贴在护栏上，微弱的震动透过指尖传来。一条新的讯息浮现在眼前：
+              <em>“晨光谱系数据回传完成——记忆回廊将于 30 分钟后开启。”</em>
+            </p>
+            <p>
+              黎川深吸一口气。他知道，这是一次无法回头的旅程。记忆回廊会将旧日与未来重叠，
+              让每个人都看见真正的自己。但他更担心的是，若那些沉睡的记忆苏醒，城市是否做好承受真相的准备。
+            </p>
+            <blockquote>
+              “如果真实让你恐惧，那就把恐惧化作光。” ——浮城传说
+            </blockquote>
+            <p>
+              他回头看向站在门口的夏茗。她的额前还挂着未干的水滴，显然是一路奔跑过来的。
+              “计划提前了，浮城委员会需要我们现在就做决定。”夏茗轻声说道。
+            </p>
+            <p>
+              黎川点头，目光重新投向渐渐升起的太阳。光线穿透雾气，将整个浮城染成金色。他突然明白，
+              不论结果如何，这座城市终将迎来自己的黎明。
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="writer-studio" id="writer">
+      <div class="container section-header">
+        <div>
+          <p class="eyebrow">创作者工作室</p>
+          <h2>把灵感与结构一起写进作品</h2>
+          <p class="section-subtitle">
+            模块化章节管理、情绪配乐、自动章节排版与字数统计，帮你保持灵感流动。
+          </p>
+        </div>
+        <button class="btn secondary" data-action="open-writer">打开创作面板</button>
+      </div>
+      <div class="container writer-grid">
+        <div class="writer-panel">
+          <div class="writer-tabs">
+            <button class="tab active" data-panel="outline">章节笔记</button>
+            <button class="tab" data-panel="draft">草稿</button>
+            <button class="tab" data-panel="preview">排版预览</button>
+          </div>
+          <div class="writer-panels">
+            <div class="panel active" id="panel-outline">
+              <h3>《晨光谱系》 · 章节笔记</h3>
+              <ul class="note-list">
+                <li>
+                  <strong>人物动机</strong>
+                  <p>黎川对“真实”的执念与夏茗对“记忆”的恐惧形成对照。</p>
+                </li>
+                <li>
+                  <strong>情节节奏</strong>
+                  <p>第一幕静态观景，第二幕信息冲击，第三幕情感决断。</p>
+                </li>
+                <li>
+                  <strong>视觉意象</strong>
+                  <p>晨光、金色雾气、漂浮群岛与透明观星台形成反复出现的意象。</p>
+                </li>
+              </ul>
+            </div>
+            <div class="panel" id="panel-draft">
+              <h3>写作空间</h3>
+              <label class="input-label" for="draft-title">章节标题</label>
+              <input id="draft-title" type="text" placeholder="例如：第十三章 · 海浪回音" maxlength="40">
+              <label class="input-label" for="draft-tags">标签</label>
+              <input id="draft-tags" type="text" placeholder="软科幻, 群像, 治愈">
+              <label class="input-label" for="draft-body">正文</label>
+              <textarea id="draft-body" rows="14" placeholder="在这里开始书写你的灵感……"></textarea>
+              <div class="writer-meta">
+                <p>实时字数：<span id="word-count">0</span> 字</p>
+                <button class="btn ghost" data-action="save-draft">保存到本地</button>
+              </div>
+            </div>
+            <div class="panel" id="panel-preview">
+              <h3>排版预览</h3>
+              <article class="preview-article">
+                <h4 id="preview-title">第十三章 · 标题预览</h4>
+                <p id="preview-body">你在写作空间中输入的内容会即时排版呈现，方便你检查节奏与段落流动。</p>
+                <div class="preview-tags" id="preview-tags">
+                  <span>软科幻</span><span>群像</span><span>治愈</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+        <aside class="writer-sidebar">
+          <div class="sidebar-card">
+            <h4>灵感瞬间</h4>
+            <p>用“灵感快照”捕捉零碎念头，稍后再整合进章节。</p>
+            <button class="btn ghost" data-action="capture-idea">记录灵感</button>
+          </div>
+          <div class="sidebar-card">
+            <h4>进度日历</h4>
+            <p>可视化写作习惯，连续创作天数一目了然。</p>
+            <div class="calendar">
+              <span class="filled"></span><span class="filled"></span><span></span><span class="filled"></span><span></span><span></span><span class="filled"></span>
+            </div>
+          </div>
+          <div class="sidebar-card">
+            <h4>写作音乐频道</h4>
+            <p>选择氛围配乐，与文本情绪同步。</p>
+            <select id="music-mood">
+              <option value="ambient">环绕 · 深夜漂流</option>
+              <option value="lofi">Lo-Fi · 城市光影</option>
+              <option value="piano">钢琴 · 温柔晨光</option>
+            </select>
+            <button class="btn secondary" data-action="play-music">播放预设</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="community" id="community">
+      <div class="container section-header">
+        <div>
+          <p class="eyebrow">灵感广场</p>
+          <h2>创作者与读者的双向旅程</h2>
+          <p class="section-subtitle">
+            从灵感征稿到读者共创，保持 Pixiv 风格的同时，让互动更深、更柔和。
+          </p>
+        </div>
+        <button class="btn ghost">加入活动</button>
+      </div>
+      <div class="container community-grid">
+        <article class="community-card">
+          <h4>星海命题 · 每周共创</h4>
+          <p>根据给定意象创作 1200 字以内的短篇，与读者一起构建宇宙细节。</p>
+          <div class="pill-strip">
+            <span>本周主题：浮岛暮色</span>
+            <span>提交截止：周日 22:00</span>
+          </div>
+        </article>
+        <article class="community-card">
+          <h4>读者共读会</h4>
+          <p>策划沉浸式共读活动，读者可以实时弹幕式标记最触动的瞬间。</p>
+          <div class="pill-strip">
+            <span>报名人数：148</span>
+            <span>下次时间：周三 20:00</span>
+          </div>
+        </article>
+        <article class="community-card">
+          <h4>灵光闪现 · 收藏型书单</h4>
+          <p>集结同频阅读者，把零散灵感收集成策展式书单，提升作品曝光。</p>
+          <div class="pill-strip">
+            <span>热门书单：8 个</span>
+            <span>平均收藏：9,300+</span>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-logo">星</span>
+        <div>
+          <strong>星海小说</strong>
+          <p>让中文原创在温柔的光里闪耀。</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#">关于我们</a>
+        <a href="#">创作者中心</a>
+        <a href="#">读者小组</a>
+        <a href="#">隐私与条款</a>
+      </div>
+      <p class="footer-note">© 2024 星海小说. Inspired by Pixiv Novels · Crafted for better reading flow.</p>
+    </div>
+  </footer>
+
+  <div class="reader-modal" id="reader-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-action="close-modal"></div>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-label="沉浸阅读模式">
+      <button class="modal-close" data-action="close-modal">×</button>
+      <div class="modal-progress">
+        <div class="progress-bar slim" data-progress="modal" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="全屏阅读进度">
+          <span class="progress-fill"></span>
+        </div>
+      </div>
+      <div class="modal-reader">
+        <aside class="modal-toc"></aside>
+        <article class="modal-article"></article>
+      </div>
+    </div>
+  </div>
+
+  <div class="idea-toast" id="idea-toast" role="status" aria-live="polite">
+    灵感已捕捉，稍后可在“章节笔记”查看。
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
