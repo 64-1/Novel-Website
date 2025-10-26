@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let autosaveTimer = null;
   let lastSavedSnapshot = "";
   const AUTOSAVE_DELAY = 1000;
+  let readerThemeOverride = false;
   let lastFocusedElement = null;
   let focusTrapListener = null;
   let focusableModalElements = [];
@@ -148,9 +149,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------- Theme & Shell ----------
   themeToggleBtn?.addEventListener("click", () => {
     body.classList.toggle("dark-shell");
-    const mode = body.classList.contains("dark-shell") ? "dark" : "light";
+    const mode = getShellMode();
     localStorage.setItem(shellThemeKey, mode);
     updateShellThemeButton(mode);
+    syncReaderThemeWithShell();
   });
 
   function initialiseShellTheme() {
@@ -158,12 +160,32 @@ document.addEventListener("DOMContentLoaded", () => {
     if (stored === "dark") {
       body.classList.add("dark-shell");
     }
-    updateShellThemeButton(body.classList.contains("dark-shell") ? "dark" : "light");
+    const mode = getShellMode();
+    updateShellThemeButton(mode);
+    syncReaderThemeWithShell({ respectOverride: false });
   }
 
   function updateShellThemeButton(mode) {
     if (!themeToggleBtn) return;
     themeToggleBtn.textContent = mode === "dark" ? "日间模式" : "夜间模式";
+  }
+
+  function getShellMode() {
+    return body.classList.contains("dark-shell") ? "dark" : "light";
+  }
+
+  function syncReaderThemeWithShell({ respectOverride = true } = {}) {
+    if (respectOverride && readerThemeOverride) {
+      return;
+    }
+    const desiredTheme = getShellMode() === "dark" ? "night" : "day";
+    if (readerSettings.theme !== desiredTheme) {
+      readerSettings.theme = desiredTheme;
+      applyReaderSettings();
+      persistReaderSettings();
+      syncModalTheme();
+    }
+    readerThemeOverride = false;
   }
 
   async function initChapters() {
@@ -280,9 +302,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   readerThemeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      readerThemeButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      readerSettings.theme = btn.dataset.theme || "day";
+      const selectedTheme = btn.dataset.theme || "day";
+      readerSettings.theme = selectedTheme;
+      readerThemeOverride = selectedTheme !== (getShellMode() === "dark" ? "night" : "day");
       applyReaderSettings();
       persistReaderSettings();
       syncModalTheme();
