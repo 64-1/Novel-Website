@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
   const shellThemeKey = "xinghai-shell-theme";
   const readerSettingsKey = "xinghai-reader-settings";
-  const draftStorageKey = "xinghai-draft";
+  const draftStorageKey = "novel:draft";
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -28,7 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const noteList = document.querySelector(".note-list");
   const ideaToast = document.getElementById("idea-toast");
   const ideaButton = document.querySelector('[data-action="capture-idea"]');
-  const saveDraftButton = document.querySelector('[data-action="save-draft"]');
+  const autosaveStatus = document.getElementById("autosave-status");
+  const exportButton = document.querySelector('[data-action="export-markdown"]');
+  const importButton = document.querySelector('[data-action="import-markdown"]');
+  const importInput = document.getElementById("import-file");
   const draftTitle = document.getElementById("draft-title");
   const draftTags = document.getElementById("draft-tags");
   const draftBody = document.getElementById("draft-body");
@@ -43,6 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentChapterIndex = 0;
   let readerProgressTracker;
   let modalProgressTracker;
+  let autosaveTimer = null;
+  let lastSavedSnapshot = "";
+  const AUTOSAVE_DELAY = 1000;
 
   // LocalStorage keys for per-chapter reading progress
   const STORAGE_KEYS = {
@@ -527,45 +533,22 @@ document.addEventListener("DOMContentLoaded", () => {
     input?.addEventListener("input", () => {
       updateWordCount();
       updatePreview();
+      scheduleAutosave();
     });
   });
 
-  saveDraftButton?.addEventListener("click", () => {
-    const payload = {
-      title: draftTitle?.value || "",
-      tags: draftTags?.value || "",
-      body: draftBody?.value || "",
-      savedAt: new Date().toISOString()
-    };
-    try {
-      localStorage.setItem(draftStorageKey, JSON.stringify(payload));
-      showToast("草稿已保存到本地（浏览器缓存）。");
-      if (saveDraftButton) {
-        const originalText = saveDraftButton.textContent;
-        saveDraftButton.textContent = "已保存 ✓";
-        saveDraftButton.disabled = true;
-        setTimeout(() => {
-          saveDraftButton.textContent = originalText;
-          saveDraftButton.disabled = false;
-        }, 1800);
-      }
-    } catch (error) {
-      console.error("草稿保存失败：", error);
-      showToast("保存失败，请检查浏览器权限。");
-    }
-  });
+  exportButton?.addEventListener("click", handleExportMarkdown);
+  importButton?.addEventListener("click", () => importInput?.click());
+  importInput?.addEventListener("change", handleImportMarkdown);
 
   function loadDraftFromStorage() {
-    try {
-      const stored = localStorage.getItem(draftStorageKey);
-      if (!stored) return;
-      const draft = JSON.parse(stored);
-      if (draftTitle) draftTitle.value = draft.title || "";
-      if (draftTags) draftTags.value = draft.tags || "";
-      if (draftBody) draftBody.value = draft.body || "";
-    } catch (error) {
-      console.warn("读取草稿失败：", error);
-    }
+    const draft = readDraftSnapshot();
+    if (!draft) return;
+    if (draftTitle) draftTitle.value = draft.title || "";
+    if (draftTags) draftTags.value = draft.tags || "";
+    if (draftBody) draftBody.value = draft.body || "";
+    lastSavedSnapshot = JSON.stringify(buildDraftSnapshot());
+    setAutosaveStatus("已自动保存");
   }
 
   function updateWordCount() {
@@ -584,20 +567,257 @@ document.addEventListener("DOMContentLoaded", () => {
         draftBody?.value?.trim() || "你在写作空间中输入的内容会即时排版呈现，方便你检查节奏与段落流动。";
     }
     if (previewTags) {
-      const tagsValue = draftTags?.value || "软科幻, 群像, 治愈";
+      const tagsInput = draftTags?.value ?? "";
+      const tagsForPreview = tagsInput ? getTagList(tagsInput, 6) : ["软科幻", "群像", "治愈"];
       const tagsFragment = document.createDocumentFragment();
-      tagsValue
-        .split(/[,，、\s]+/)
-        .filter(Boolean)
-        .slice(0, 6)
-        .forEach((tag) => {
-          const span = document.createElement("span");
-          span.textContent = tag;
-          tagsFragment.appendChild(span);
-        });
+      tagsForPreview.forEach((tag) => {
+        const span = document.createElement("span");
+        span.textContent = tag;
+        tagsFragment.appendChild(span);
+      });
       previewTags.innerHTML = "";
       previewTags.appendChild(tagsFragment);
     }
+  }
+
+  function scheduleAutosave(options = {}) {
+    const { immediate = false } = options;
+    if (!draftTitle && !draftTags && !draftBody) return;
+    if (immediate) {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = null;
+      performAutosave();
+      return;
+    }
+    clearTimeout(autosaveTimer);
+    setAutosaveStatus("保存中…", true);
+    autosaveTimer = window.setTimeout(() => {
+      performAutosave();
+    }, AUTOSAVE_DELAY);
+  }
+
+  function performAutosave() {
+    autosaveTimer = null;
+    const snapshot = buildDraftSnapshot();
+    const serialized = JSON.stringify(snapshot);
+    if (serialized === lastSavedSnapshot) {
+      setAutosaveStatus("已自动保存");
+      return;
+    }
+    try {
+      localStorage.setItem(draftStorageKey, serialized);
+      lastSavedSnapshot = serialized;
+      setAutosaveStatus("已自动保存");
+    } catch (error) {
+      console.error("草稿自动保存失败：", error);
+      setAutosaveStatus("自动保存失败", false);
+    }
+  }
+
+  function buildDraftSnapshot() {
+    return {
+      title: draftTitle?.value?.trim() || "",
+      tags: draftTags?.value?.trim() || "",
+      body: draftBody?.value || ""
+    };
+  }
+
+  function readDraftSnapshot() {
+    const keys = [draftStorageKey, "xinghai-draft"];
+    for (const key of keys) {
+      try {
+        const stored = localStorage.getItem(key);
+        if (!stored) continue;
+        const parsed = JSON.parse(stored);
+        if (!parsed || typeof parsed !== "object") continue;
+        return {
+          title: typeof parsed.title === "string" ? parsed.title : "",
+          tags: Array.isArray(parsed.tags) ? parsed.tags.join(", ") : typeof parsed.tags === "string" ? parsed.tags : "",
+          body: typeof parsed.body === "string" ? parsed.body : ""
+        };
+      } catch (error) {
+        console.warn("读取草稿失败：", error);
+      }
+    }
+    return null;
+  }
+
+  function setAutosaveStatus(message, saving = false) {
+    if (!autosaveStatus) return;
+    autosaveStatus.textContent = message;
+    autosaveStatus.classList.toggle("saving", Boolean(saving));
+  }
+
+  function getTagList(raw, limit) {
+    const tags = (raw || "")
+      .split(/[,，、\s]+/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    if (typeof limit === "number") {
+      return tags.slice(0, limit);
+    }
+    return tags;
+  }
+
+  function handleExportMarkdown() {
+    const snapshot = buildDraftSnapshot();
+    const tags = getTagList(snapshot.tags);
+    const exportTitle = (snapshot.title || "未命名草稿").replace(/\r?\n/g, " ").trim();
+    const frontMatter = [
+      "---",
+      `title: "${escapeYamlString(exportTitle || "未命名草稿")}"`
+    ];
+    if (tags.length) {
+      frontMatter.push("tags:");
+      tags.forEach((tag) => {
+        frontMatter.push(`  - "${escapeYamlString(tag)}"`);
+      });
+    } else {
+      frontMatter.push("tags: []");
+    }
+    frontMatter.push("---", "");
+
+    const body = snapshot.body || "";
+    const content = `${frontMatter.join("\n")}${body}`;
+    const filename = `${createFileSlug(exportTitle || "draft")}_${formatDate(new Date())}.md`;
+
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportMarkdown(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const imported = parseMarkdownFile(text);
+      if (draftTitle) draftTitle.value = imported.title || "";
+      if (draftTags) draftTags.value = imported.tags.length ? imported.tags.join(", ") : "";
+      if (draftBody) draftBody.value = imported.body || "";
+      updateWordCount();
+      updatePreview();
+      scheduleAutosave({ immediate: true });
+    } catch (error) {
+      console.error("导入 Markdown 失败：", error);
+    } finally {
+      if (importInput) {
+        importInput.value = "";
+      }
+    }
+  }
+
+  function parseMarkdownFile(content) {
+    const sanitized = content.replace(/^\uFEFF/, "");
+    const { meta, body } = parseFrontMatter(sanitized);
+    const tags = Array.isArray(meta.tags) ? meta.tags : getTagList(meta.tags || "");
+    return {
+      title: meta.title || "",
+      tags,
+      body
+    };
+  }
+
+  function parseFrontMatter(text) {
+    const lines = text.split(/\r?\n/);
+    if (lines[0]?.trim() !== "---") {
+      return { meta: {}, body: text };
+    }
+    const metaLines = [];
+    let index = 1;
+    let hasClosingFence = false;
+    for (; index < lines.length; index++) {
+      if (lines[index].trim() === "---") {
+        index++;
+        hasClosingFence = true;
+        break;
+      }
+      metaLines.push(lines[index]);
+    }
+    if (!hasClosingFence) {
+      return { meta: {}, body: text };
+    }
+    const meta = extractMeta(metaLines);
+    const body = lines.slice(index).join("\n").replace(/^\n/, "");
+    return { meta, body };
+  }
+
+  function extractMeta(lines) {
+    const meta = {};
+    const collectedTagLines = [];
+    let collectingTags = false;
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) continue;
+      if (collectingTags) {
+        if (trimmed.startsWith("-")) {
+          collectedTagLines.push(stripQuotes(trimmed.slice(1).trim()));
+          continue;
+        }
+        collectingTags = false;
+      }
+      if (trimmed.startsWith("title:")) {
+        meta.title = stripQuotes(trimmed.slice(6).trim());
+      } else if (trimmed.startsWith("tags:")) {
+        const value = trimmed.slice(5).trim();
+        if (!value) {
+          collectingTags = true;
+          continue;
+        } else if (value.startsWith("[") && value.endsWith("]")) {
+          meta.tags = value
+            .slice(1, -1)
+            .split(/[,，]/)
+            .map((tag) => stripQuotes(tag.trim()))
+            .filter(Boolean);
+        } else {
+          meta.tags = value
+            .split(/[,，]/)
+            .map((tag) => stripQuotes(tag.trim()))
+            .filter(Boolean);
+        }
+      }
+    }
+    if (collectedTagLines.length) {
+      meta.tags = collectedTagLines;
+    }
+    return meta;
+  }
+
+  function stripQuotes(value) {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  }
+
+  function escapeYamlString(value) {
+    return String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  function createFileSlug(value) {
+    const normalized = (value || "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^\w\u4e00-\u9fa5-]+/g, "_");
+    return normalized || "draft";
+  }
+
+  function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}${month}${day}`;
   }
 
   function showToast(message) {

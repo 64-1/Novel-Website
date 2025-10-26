@@ -793,8 +793,27 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   font-size: 14px;
   color: var(--text-muted);
+}
+
+.autosave-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-height: 18px;
+  transition: color var(--transition), opacity var(--transition);
+}
+
+.autosave-status.saving {
+  color: var(--primary);
+}
+
+.writer-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .preview-article {
