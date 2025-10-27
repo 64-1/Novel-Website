@@ -1,8 +1,14 @@
 document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
-  const shellThemeKey = "xinghai-shell-theme";
-  const readerSettingsKey = "xinghai-reader-settings";
-  const draftStorageKey = "novel:draft";
+  if (!window.NovelStores) {
+    throw new Error("NovelStores not initialised. Ensure js/services/Stores.js is loaded before app.js");
+  }
+  const {
+    ReaderSettingsStore,
+    DraftStore,
+    ShellThemeStore,
+    ProgressStore
+  } = window.NovelStores;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -52,6 +58,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastSavedSnapshot = "";
   const AUTOSAVE_DELAY = 1000;
   let readerThemeOverride = false;
+  let slugToIndex = new Map();
+  let chaptersReady = false;
+  let suppressHashChange = false;
   let lastFocusedElement = null;
   let focusTrapListener = null;
   let focusableModalElements = [];
@@ -63,12 +72,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modalContent && !modalContent.hasAttribute("tabindex")) {
     modalContent.setAttribute("tabindex", "-1");
   }
-
-  // LocalStorage keys for per-chapter reading progress (slug-based)
-  const STORAGE_KEYS = {
-    reader: (id) => `progress:${id}`,
-    modal: (id) => `progress:modal:${id}`
-  };
 
   const fallbackChapters = [
     {
@@ -150,15 +153,17 @@ document.addEventListener("DOMContentLoaded", () => {
   themeToggleBtn?.addEventListener("click", () => {
     body.classList.toggle("dark-shell");
     const mode = getShellMode();
-    localStorage.setItem(shellThemeKey, mode);
+    ShellThemeStore.save(mode);
     updateShellThemeButton(mode);
     syncReaderThemeWithShell();
   });
 
   function initialiseShellTheme() {
-    const stored = localStorage.getItem(shellThemeKey);
+    const stored = ShellThemeStore.load();
     if (stored === "dark") {
       body.classList.add("dark-shell");
+    } else if (stored === "light") {
+      body.classList.remove("dark-shell");
     }
     const mode = getShellMode();
     updateShellThemeButton(mode);
@@ -204,7 +209,15 @@ document.addEventListener("DOMContentLoaded", () => {
     renderToc();
     setupModalContents();
     currentChapterIndex = Math.min(currentChapterIndex, chapters.length - 1);
-    selectChapter(currentChapterIndex);
+    selectChapter(currentChapterIndex, { updateHash: false });
+    chaptersReady = true;
+    const routeHandled = handleRoute({ initial: true });
+    if (!routeHandled) {
+      if (!window.location.hash || window.location.hash.startsWith("#novel/")) {
+        const initialSlug = getChapterSlug(chapters[currentChapterIndex], currentChapterIndex);
+        updateHashForChapter(initialSlug);
+      }
+    }
   }
 
   async function loadChaptersFromJson() {
@@ -246,13 +259,16 @@ document.addEventListener("DOMContentLoaded", () => {
           .map((paragraph) => normalizeParagraph(paragraph))
           .filter((paragraph) => paragraph !== null)
       : [];
+    const readingStats = computeReadingStats(paragraphs);
 
     return {
       id,
       slug,
       title,
       summary,
-      paragraphs
+      paragraphs,
+      wordCount: readingStats.words,
+      readingMinutes: readingStats.minutes
     };
   }
 
@@ -273,6 +289,56 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
+  function computeReadingStats(paragraphs) {
+    const textPieces = [];
+    paragraphs.forEach((paragraph) => {
+      if (typeof paragraph === "string") {
+        textPieces.push(paragraph);
+      } else if (paragraph && typeof paragraph.text === "string") {
+        textPieces.push(paragraph.text);
+      }
+    });
+    const text = textPieces.join(" ");
+    const words = countWordsApprox(text);
+    const minutes = Math.max(1, Math.round(words / 220));
+    return { words, minutes };
+  }
+
+  function countWordsApprox(text) {
+    if (!text) return 0;
+    const cjkMatches = text.match(/[\u3400-\u9FFF]/g);
+    const cjkCount = cjkMatches ? cjkMatches.length : 0;
+    const nonCjkText = text.replace(/[\u3400-\u9FFF]/g, " ");
+    const latinTokens = nonCjkText
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    return cjkCount + latinTokens.length;
+  }
+
+  function getChapterStats(chapter) {
+    if (!chapter) {
+      return { minutes: 1, words: 0 };
+    }
+    if (typeof chapter.readingMinutes === "number" && typeof chapter.wordCount === "number") {
+      return {
+        minutes: Math.max(1, Math.round(chapter.readingMinutes)),
+        words: Math.max(0, Math.round(chapter.wordCount))
+      };
+    }
+    const stats = computeReadingStats(chapter.paragraphs || []);
+    chapter.readingMinutes = stats.minutes;
+    chapter.wordCount = stats.words;
+    return stats;
+  }
+
+  function formatReadingTime(minutes, words) {
+    const safeMinutes = Math.max(1, Math.round(minutes || 1));
+    const safeWords = Math.max(0, Math.round(words || 0));
+    const wordSuffix = safeWords ? ` · ${safeWords} 字` : "";
+    return `≈ ${safeMinutes} 分钟读完${wordSuffix}`;
+  }
+
   // ---------- Smooth scroll ----------
   scrollButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -285,6 +351,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   openWriterBtn?.addEventListener("click", () => {
     document.getElementById("writer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  window.addEventListener("hashchange", () => {
+    if (suppressHashChange) {
+      suppressHashChange = false;
+      return;
+    }
+    if (!chaptersReady) {
+      return;
+    }
+    handleRoute();
   });
 
   // ---------- Reader controls ----------
@@ -355,24 +432,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function loadReaderSettings() {
-    try {
-      const stored = localStorage.getItem(readerSettingsKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return {
-          fontSize: Number(parsed.fontSize) || 18,
-          lineHeight: Number(parsed.lineHeight) || 1.6,
-          theme: parsed.theme || "day"
-        };
-      }
-    } catch (error) {
-      console.warn("读取阅读设置失败，使用默认值。", error);
+    const stored = ReaderSettingsStore.load();
+    if (stored && typeof stored === "object") {
+      return {
+        fontSize: Number(stored.fontSize) || 18,
+        lineHeight: Number(stored.lineHeight) || 1.6,
+        theme: stored.theme || "day"
+      };
     }
     return { fontSize: 18, lineHeight: 1.6, theme: "day" };
   }
 
   function persistReaderSettings() {
-    localStorage.setItem(readerSettingsKey, JSON.stringify(readerSettings));
+    ReaderSettingsStore.save(readerSettings);
   }
 
   function applyReaderSettings() {
@@ -390,25 +462,55 @@ document.addEventListener("DOMContentLoaded", () => {
     modalProgressTracker?.refresh({ fromStorage: true });
   }
 
-  function selectChapter(index) {
+  function selectChapter(index, options = {}) {
     if (!chapters.length) return;
+    const { updateHash = true } = options;
     const safeIndex = Math.max(0, Math.min(index, chapters.length - 1));
+    const chapter = chapters[safeIndex];
+    if (!chapter) return;
     currentChapterIndex = safeIndex;
     renderChapter(safeIndex);
     renderChapter(safeIndex, modalArticle);
     highlightToc(safeIndex);
     updateModalList(safeIndex);
     syncModalTheme();
+    if (updateHash) {
+      const slug = getChapterSlug(chapter, safeIndex);
+      updateHashForChapter(slug);
+    }
+  }
+
+  function getChapterSlug(chapter, index) {
+    if (!chapter) {
+      return `chapter-${(typeof index === "number" ? index : 0) + 1}`;
+    }
+    if (typeof chapter.slug === "string" && chapter.slug.trim()) {
+      return chapter.slug.trim();
+    }
+    if (typeof chapter.id === "string" && chapter.id.trim()) {
+      return chapter.id.trim();
+    }
+    const fallbackIndex = typeof index === "number" ? index : chapters.indexOf(chapter);
+    return `chapter-${(fallbackIndex >= 0 ? fallbackIndex : 0) + 1}`;
   }
 
   function renderChapter(index, target = readerContent) {
     const chapter = chapters[index];
     if (!chapter || !target) return;
-    const slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
+    const slug = getChapterSlug(chapter, index);
     target.innerHTML = "";
     const title = document.createElement("h3");
     title.textContent = chapter.title;
     target.appendChild(title);
+
+    const stats = getChapterStats(chapter);
+    const readingMeta = document.createElement("div");
+    readingMeta.className = "reading-meta";
+    const timeBadge = document.createElement("span");
+    timeBadge.className = "reading-time";
+    timeBadge.textContent = formatReadingTime(stats.minutes, stats.words);
+    readingMeta.appendChild(timeBadge);
+    target.appendChild(readingMeta);
 
     if (target === modalArticle && chapter.summary) {
       const summary = document.createElement("p");
@@ -442,16 +544,73 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderToc() {
     if (!tocList) return;
+    slugToIndex = new Map();
     tocList.innerHTML = "";
     chapters.forEach((chapter, index) => {
       const item = document.createElement("li");
+      const slug = getChapterSlug(chapter, index);
+      slugToIndex.set(slug, index);
+      slugToIndex.set(encodeURIComponent(slug), index);
       item.textContent = chapter.title;
-      item.dataset.slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
+      item.dataset.slug = slug;
       item.addEventListener("click", () => selectChapter(index));
       tocList.appendChild(item);
     });
     tocItems = Array.from(tocList.querySelectorAll("li"));
     refreshFocusTrapElements();
+  }
+
+  function updateHashForChapter(slug) {
+    if (!slug) return;
+    const encoded = encodeURIComponent(slug);
+    const desiredHash = `#novel/${encoded}`;
+    if (window.location.hash === desiredHash) {
+      return;
+    }
+    suppressHashChange = true;
+    window.location.hash = desiredHash;
+  }
+
+  function handleRoute({ initial = false } = {}) {
+    if (!chaptersReady) {
+      return false;
+    }
+    const rawHash = window.location.hash;
+    if (!rawHash) {
+      return false;
+    }
+    const hash = rawHash.replace(/^#/, "");
+    if (!hash) {
+      return false;
+    }
+    if (hash === "reader") {
+      scrollToSection("reader", initial ? "auto" : "smooth");
+      return true;
+    }
+    if (hash === "writer") {
+      scrollToSection("writer", initial ? "auto" : "smooth");
+      return true;
+    }
+    if (hash.startsWith("novel/")) {
+      const slugPart = hash.slice("novel/".length);
+      if (!slugPart) {
+        return false;
+      }
+      const decoded = decodeURIComponent(slugPart);
+      const index = slugToIndex.get(decoded) ?? slugToIndex.get(slugPart);
+      if (typeof index === "number" && index >= 0 && index < chapters.length) {
+        selectChapter(index, { updateHash: false });
+        scrollToSection("reader", initial ? "auto" : "smooth");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function scrollToSection(id, behavior = "smooth") {
+    const section = document.getElementById(id);
+    if (!section) return;
+    section.scrollIntoView({ behavior, block: "start" });
   }
 
   function highlightToc(index) {
@@ -475,7 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const item = document.createElement("li");
       const isActive = index === currentChapterIndex;
       item.textContent = chapter.title;
-      item.dataset.slug = chapter.slug || chapter.id || `chapter-${index + 1}`;
+      item.dataset.slug = getChapterSlug(chapter, index);
       if (isActive) {
         item.classList.add("active");
         item.setAttribute("aria-current", "true");
@@ -744,33 +903,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function persistProgress(progress) {
       storedProgress = clampProgress(progress);
-      const key = getStorageKey();
-      if (!key) return;
-      try {
-        localStorage.setItem(key, storedProgress.toFixed(4));
-      } catch (error) {
-        console.warn("保存阅读进度失败：", error);
-      }
-    }
-
-    function getStorageKey(slug = chapterSlug) {
-      if (!slug) return null;
-      const sanitizedSlug = String(slug).trim();
-      if (!sanitizedSlug) return null;
-      return context === "modal" ? STORAGE_KEYS.modal(sanitizedSlug) : STORAGE_KEYS.reader(sanitizedSlug);
+      ProgressStore.save(chapterSlug, context, storedProgress);
     }
 
     function readStoredProgress() {
-      const key = getStorageKey();
-      if (!key) return 0;
-      try {
-        const raw = localStorage.getItem(key);
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? clampProgress(parsed) : 0;
-      } catch (error) {
-        console.warn("读取阅读进度失败：", error);
-        return 0;
-      }
+      return clampProgress(ProgressStore.load(chapterSlug, context));
     }
 
     function applyStoredScroll() {
@@ -927,7 +1064,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     try {
-      localStorage.setItem(draftStorageKey, serialized);
+      const success = DraftStore.save(snapshot);
+      if (success === false) {
+        throw new Error("DraftStore.save returned false");
+      }
       lastSavedSnapshot = serialized;
       setAutosaveStatus("已自动保存");
     } catch (error) {
@@ -945,23 +1085,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function readDraftSnapshot() {
-    const keys = [draftStorageKey, "xinghai-draft"];
-    for (const key of keys) {
-      try {
-        const stored = localStorage.getItem(key);
-        if (!stored) continue;
-        const parsed = JSON.parse(stored);
-        if (!parsed || typeof parsed !== "object") continue;
-        return {
-          title: typeof parsed.title === "string" ? parsed.title : "",
-          tags: Array.isArray(parsed.tags) ? parsed.tags.join(", ") : typeof parsed.tags === "string" ? parsed.tags : "",
-          body: typeof parsed.body === "string" ? parsed.body : ""
-        };
-      } catch (error) {
-        console.warn("读取草稿失败：", error);
-      }
+    const draft = DraftStore.load();
+    if (!draft || typeof draft !== "object") {
+      return null;
     }
-    return null;
+    return {
+      title: typeof draft.title === "string" ? draft.title : "",
+      tags: Array.isArray(draft.tags) ? draft.tags.join(", ") : typeof draft.tags === "string" ? draft.tags : "",
+      body: typeof draft.body === "string" ? draft.body : ""
+    };
   }
 
   function setAutosaveStatus(message, saving = false) {
