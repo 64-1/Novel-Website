@@ -18,6 +18,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelTocList) {
     throw new Error("NovelTocList not initialised. Ensure js/reader/TocList.js is loaded before app.js");
   }
+  if (!window.NovelFocusTrap) {
+    throw new Error("NovelFocusTrap not initialised. Ensure js/a11y/FocusTrap.js is loaded before app.js");
+  }
+  if (!window.NovelReaderModal) {
+    throw new Error("NovelReaderModal not initialised. Ensure js/modal/ReaderModal.js is loaded before app.js");
+  }
   const {
     ReaderSettingsStore,
     DraftStore
@@ -27,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ProgressTrackerFactory = window.NovelReaderProgressTracker;
   const ReaderViewFactory = window.NovelReaderView;
   const TocListFactory = window.NovelTocList;
+  const ReaderModalFactory = window.NovelReaderModal;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -76,17 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const AUTOSAVE_DELAY = 1000;
   let chaptersReady = false;
   let suppressHashChange = false;
-  let lastFocusedElement = null;
-  let focusTrapListener = null;
-  let focusableModalElements = [];
-  let firstModalFocusable = null;
-  let lastModalFocusable = null;
-  const FOCUSABLE_SELECTOR =
-    'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
-
-  if (modalContent && !modalContent.hasAttribute("tabindex")) {
-    modalContent.setAttribute("tabindex", "-1");
-  }
+  let readerModalController = null;
 
   let chapters = [];
 
@@ -124,6 +121,17 @@ document.addEventListener("DOMContentLoaded", () => {
     modalTracker: modalProgressTracker
   });
 
+  readerModalController = readerModal
+    ? ReaderModalFactory.create({
+        modalElement: readerModal,
+        modalContent,
+        openButton: openReaderBtn,
+        closeElements: modalCloseElements,
+        progressTracker: modalProgressTracker,
+        syncTheme: syncModalTheme
+      })
+    : null;
+
   const tocListController = TocListFactory.create({
     tocContainer: tocList,
     modalContainer: modalTocContainer,
@@ -151,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chapters = ChaptersRepo.list();
 
     tocListController.render();
+    readerModalController?.refreshFocusTrap();
     if (!chapters.length) {
       console.warn("未找到任何章节数据。");
       return;
@@ -224,42 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
     readerLayoutBtn.textContent = readerLayoutBtn.classList.contains("active") ? "切换常规" : "切换宽屏";
     readerProgressTracker?.refresh({ fromStorage: true });
   });
-
-  openReaderBtn?.addEventListener("click", () => {
-    if (!readerModal) return;
-    lastFocusedElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    readerModal.classList.add("active");
-    readerModal.setAttribute("aria-hidden", "false");
-    syncModalTheme();
-    modalProgressTracker?.refresh({ fromStorage: true });
-    document.documentElement.style.overflow = "hidden";
-    activateFocusTrap();
-    requestAnimationFrame(() => focusFirstModalElement());
-  });
-
-  modalCloseElements.forEach((element) => {
-    element.addEventListener("click", closeModal);
-  });
-
-  if (readerModal) {
-    readerModal.addEventListener("click", (event) => {
-      if (event.target === readerModal) {
-        closeModal();
-      }
-    });
-  }
-
   document.addEventListener("keydown", handleGlobalKeydown);
-
-  function closeModal() {
-    if (!readerModal) return;
-    readerModal.classList.remove("active");
-    readerModal.setAttribute("aria-hidden", "true");
-    document.documentElement.style.overflow = "";
-    deactivateFocusTrap();
-    restoreFocus();
-  }
 
   function loadReaderSettings() {
     const stored = ReaderSettingsStore.load();
@@ -311,12 +285,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!chapter) return;
     currentChapterIndex = safeIndex;
     tocListController.setActive(safeIndex);
+    readerModalController?.refreshFocusTrap();
     syncModalTheme();
     if (updateHash) {
       updateHashForChapter(chapter.slug);
     }
-    refreshFocusTrapElements();
-
   }
 
   function updateHashForChapter(slug) {
@@ -380,97 +353,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!section) return;
     section.scrollIntoView({ behavior, block: "start" });
   }
-  function activateFocusTrap() {
-    if (!readerModal) return;
-    updateFocusTrapElements();
-    if (!focusTrapListener) {
-      focusTrapListener = (event) => handleFocusTrapKeydown(event);
-      readerModal.addEventListener("keydown", focusTrapListener);
-    }
-  }
-
-  function deactivateFocusTrap() {
-    if (readerModal && focusTrapListener) {
-      readerModal.removeEventListener("keydown", focusTrapListener);
-    }
-    focusTrapListener = null;
-    focusableModalElements = [];
-    firstModalFocusable = null;
-    lastModalFocusable = null;
-  }
-
-  function updateFocusTrapElements() {
-    const container = modalContent || readerModal;
-    focusableModalElements = getFocusableElements(container);
-    firstModalFocusable = focusableModalElements[0] || null;
-    lastModalFocusable = focusableModalElements[focusableModalElements.length - 1] || null;
-  }
-
-  function refreshFocusTrapElements() {
-    if (readerModal?.classList.contains("active")) {
-      updateFocusTrapElements();
-    }
-  }
-
-  function focusFirstModalElement() {
-    updateFocusTrapElements();
-    if (firstModalFocusable) {
-      firstModalFocusable.focus({ preventScroll: true });
-    } else if (modalContent) {
-      modalContent.focus({ preventScroll: true });
-    }
-  }
-
-  function restoreFocus() {
-    const focusTarget =
-      lastFocusedElement && typeof lastFocusedElement.focus === "function"
-        ? lastFocusedElement
-        : openReaderBtn;
-    if (focusTarget && typeof focusTarget.focus === "function") {
-      focusTarget.focus({ preventScroll: true });
-    }
-    lastFocusedElement = null;
-  }
-
-  function handleFocusTrapKeydown(event) {
-    if (event.key !== "Tab") return;
-    updateFocusTrapElements();
-    if (!focusableModalElements.length) {
-      event.preventDefault();
-      if (modalContent) {
-        modalContent.focus({ preventScroll: true });
-      }
-      return;
-    }
-
-    const activeElement = document.activeElement;
-    if (event.shiftKey) {
-      if (activeElement === firstModalFocusable || !focusableModalElements.includes(activeElement)) {
-        event.preventDefault();
-        (lastModalFocusable || firstModalFocusable).focus({ preventScroll: true });
-      }
-    } else {
-      if (activeElement === lastModalFocusable) {
-        event.preventDefault();
-        (firstModalFocusable || lastModalFocusable).focus({ preventScroll: true });
-      }
-    }
-  }
-
-  function getFocusableElements(container) {
-    if (!container) return [];
-    const elements = Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR));
-    return elements.filter(
-      (element) =>
-        !element.hasAttribute("disabled") &&
-        element.getAttribute("aria-hidden") !== "true" &&
-        isElementVisible(element)
-    );
-  }
-
-  function isElementVisible(element) {
-    return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-  }
 
   function handleGlobalKeydown(event) {
     if (event.defaultPrevented) return;
@@ -486,9 +368,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (event.key === "Escape") {
-      if (readerModal?.classList.contains("active")) {
+      if (readerModalController?.isOpen()) {
         event.preventDefault();
-        closeModal();
+        readerModalController.close();
       }
       return;
     }
@@ -524,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function scrollActiveContainer(direction) {
-    const container = readerModal?.classList.contains("active") && modalArticle ? modalArticle : readerContent;
+    const container = readerModalController?.isOpen() && modalArticle ? modalArticle : readerContent;
     if (!container) return;
     const amount = Math.max(container.clientHeight * 0.9, 200);
     const offset = direction === "down" ? amount : -amount;
