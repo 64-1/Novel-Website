@@ -12,6 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelReaderView) {
     throw new Error("NovelReaderView not initialised. Ensure js/reader/ReaderView.js is loaded before app.js");
   }
+  if (!window.NovelThemeService) {
+    throw new Error("NovelThemeService not initialised. Ensure js/services/ThemeService.js is loaded before app.js");
+  }
+  if (!window.NovelTocList) {
+    throw new Error("NovelTocList not initialised. Ensure js/reader/TocList.js is loaded before app.js");
+  }
   const {
     ReaderSettingsStore,
     DraftStore
@@ -20,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ThemeService = window.NovelThemeService;
   const ProgressTrackerFactory = window.NovelReaderProgressTracker;
   const ReaderViewFactory = window.NovelReaderView;
+  const TocListFactory = window.NovelTocList;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -32,11 +39,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const lineSlider = document.querySelector('input[data-action="line-height"]');
   const readerThemeButtons = document.querySelectorAll(".theme-toggle .pill");
   const tocList = document.querySelector(".toc ol");
-  let tocItems = [];
   const readerProgressBar = document.querySelector('[data-progress="reader"]');
   const readerProgressFill = readerProgressBar?.querySelector(".progress-fill");
   const readerModal = document.getElementById("reader-modal");
-  const modalToc = readerModal ? readerModal.querySelector(".modal-toc") : null;
+  const modalTocContainer = readerModal ? readerModal.querySelector(".modal-toc") : null;
   const modalArticle = readerModal ? readerModal.querySelector(".modal-article") : null;
   const modalCloseElements = readerModal ? readerModal.querySelectorAll('[data-action="close-modal"]') : [];
   const modalProgressBar = document.querySelector('[data-progress="modal"]');
@@ -118,6 +124,12 @@ document.addEventListener("DOMContentLoaded", () => {
     modalTracker: modalProgressTracker
   });
 
+  const tocListController = TocListFactory.create({
+    tocContainer: tocList,
+    modalContainer: modalTocContainer,
+    onChapterSelect: (index) => selectChapter(index)
+  });
+
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
@@ -138,13 +150,12 @@ document.addEventListener("DOMContentLoaded", () => {
     await ChaptersRepo.load();
     chapters = ChaptersRepo.list();
 
+    tocListController.render();
     if (!chapters.length) {
       console.warn("未找到任何章节数据。");
       return;
     }
 
-    renderToc();
-    setupModalContents();
     currentChapterIndex = Math.min(currentChapterIndex, chapters.length - 1);
     selectChapter(currentChapterIndex, { updateHash: false });
     chaptersReady = true;
@@ -281,6 +292,12 @@ document.addEventListener("DOMContentLoaded", () => {
     modalProgressTracker?.refresh({ fromStorage: true });
   }
 
+  function syncModalTheme() {
+    if (modalArticle) {
+      modalArticle.dataset.theme = readerSettings.theme;
+    }
+  }
+
   function selectChapter(index, options = {}) {
     const { updateHash = true } = options;
     if (!chapters.length) {
@@ -293,28 +310,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const chapter = readerView.render(safeIndex);
     if (!chapter) return;
     currentChapterIndex = safeIndex;
-    highlightToc(safeIndex);
-    updateModalList(safeIndex);
+    tocListController.setActive(safeIndex);
     syncModalTheme();
     if (updateHash) {
       updateHashForChapter(chapter.slug);
     }
     refreshFocusTrapElements();
-  }
-  function renderToc() {
-    if (!tocList) return;
-    chapters = ChaptersRepo.list();
-    tocList.innerHTML = "";
-    chapters.forEach((chapter, index) => {
-      const item = document.createElement("li");
-      const slug = chapter.slug;
-      item.textContent = chapter.title;
-      item.dataset.slug = slug;
-      item.addEventListener("click", () => selectChapter(index));
-      tocList.appendChild(item);
-    });
-    tocItems = Array.from(tocList.querySelectorAll("li"));
-    refreshFocusTrapElements();
+
   }
 
   function updateHashForChapter(slug) {
@@ -378,64 +380,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!section) return;
     section.scrollIntoView({ behavior, block: "start" });
   }
-
-  function highlightToc(index) {
-    tocItems.forEach((item, idx) => {
-      const isActive = idx === index;
-      item.classList.toggle("active", isActive);
-      if (isActive) {
-        item.setAttribute("aria-current", "true");
-      } else {
-        item.removeAttribute("aria-current");
-      }
-    });
-  }
-
-  function setupModalContents() {
-    if (!modalArticle || !modalToc) return;
-    if (!chapters.length) {
-      chapters = ChaptersRepo.list();
-    }
-    modalArticle.dataset.theme = readerSettings.theme;
-    modalToc.innerHTML = "";
-    const list = document.createElement("ol");
-    chapters.forEach((chapter, index) => {
-      const item = document.createElement("li");
-      const isActive = index === currentChapterIndex;
-      item.textContent = chapter.title;
-      item.dataset.slug = chapter.slug;
-      if (isActive) {
-        item.classList.add("active");
-        item.setAttribute("aria-current", "true");
-      }
-      item.addEventListener("click", () => selectChapter(index));
-      list.appendChild(item);
-    });
-    modalToc.appendChild(list);
-    updateModalList(currentChapterIndex);
-    refreshFocusTrapElements();
-  }
-
-  function updateModalList(index) {
-    if (!modalToc) return;
-    modalToc.querySelectorAll("li").forEach((li, idx) => {
-      const isActive = idx === index;
-      li.classList.toggle("active", isActive);
-      if (isActive) {
-        li.setAttribute("aria-current", "true");
-      } else {
-        li.removeAttribute("aria-current");
-      }
-    });
-    refreshFocusTrapElements();
-  }
-
-  function syncModalTheme() {
-    if (modalArticle) {
-      modalArticle.dataset.theme = readerSettings.theme;
-    }
-  }
-
   function activateFocusTrap() {
     if (!readerModal) return;
     updateFocusTrapElements();
