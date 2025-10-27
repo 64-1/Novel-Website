@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelTocList) {
     throw new Error("NovelTocList not initialised. Ensure js/reader/TocList.js is loaded before app.js");
   }
+  if (!window.NovelRouter) {
+    throw new Error("NovelRouter not initialised. Ensure js/router.js is loaded before app.js");
+  }
   if (!window.NovelFocusTrap) {
     throw new Error("NovelFocusTrap not initialised. Ensure js/a11y/FocusTrap.js is loaded before app.js");
   }
@@ -33,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ProgressTrackerFactory = window.NovelReaderProgressTracker;
   const ReaderViewFactory = window.NovelReaderView;
   const TocListFactory = window.NovelTocList;
+  const Router = window.NovelRouter;
   const ReaderModalFactory = window.NovelReaderModal;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
@@ -82,7 +86,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastSavedSnapshot = "";
   const AUTOSAVE_DELAY = 1000;
   let chaptersReady = false;
-  let suppressHashChange = false;
+  let pendingRoute = null;
+  let lastRoute = null;
   let readerModalController = null;
 
   let chapters = [];
@@ -138,6 +143,21 @@ document.addEventListener("DOMContentLoaded", () => {
     onChapterSelect: (index) => selectChapter(index)
   });
 
+  Router.start({
+    onRoute: (route) => {
+      lastRoute = route;
+      if (!route) {
+        pendingRoute = null;
+        return;
+      }
+      if (!chaptersReady) {
+        pendingRoute = route;
+        return;
+      }
+      applyRoute(route);
+    }
+  });
+
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
@@ -168,11 +188,23 @@ document.addEventListener("DOMContentLoaded", () => {
     currentChapterIndex = Math.min(currentChapterIndex, chapters.length - 1);
     selectChapter(currentChapterIndex, { updateHash: false });
     chaptersReady = true;
-    const routeHandled = handleRoute({ initial: true });
+    let routeHandled = false;
+    if (pendingRoute) {
+      routeHandled = applyRoute(pendingRoute);
+      pendingRoute = null;
+    } else if (lastRoute) {
+      routeHandled = applyRoute(lastRoute);
+    }
     if (!routeHandled) {
+      const initialSlug = ChaptersRepo.getSlugByIndex(currentChapterIndex);
       if (!window.location.hash || window.location.hash.startsWith("#novel/")) {
-        const initialSlug = ChaptersRepo.getSlugByIndex(currentChapterIndex);
-        updateHashForChapter(initialSlug);
+        Router.linkToChapter(initialSlug);
+        lastRoute = {
+          type: "novel",
+          slug: initialSlug,
+          encodedSlug: encodeURIComponent(initialSlug),
+          initial: false
+        };
       }
     }
   }
@@ -189,17 +221,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   openWriterBtn?.addEventListener("click", () => {
     document.getElementById("writer")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-
-  window.addEventListener("hashchange", () => {
-    if (suppressHashChange) {
-      suppressHashChange = false;
-      return;
-    }
-    if (!chaptersReady) {
-      return;
-    }
-    handleRoute();
   });
 
   // ---------- Reader controls ----------
@@ -288,64 +309,64 @@ document.addEventListener("DOMContentLoaded", () => {
     readerModalController?.refreshFocusTrap();
     syncModalTheme();
     if (updateHash) {
-      updateHashForChapter(chapter.slug);
+      Router.linkToChapter(chapter.slug);
+      lastRoute = {
+        type: "novel",
+        slug: chapter.slug,
+        encodedSlug: encodeURIComponent(chapter.slug),
+        initial: false
+      };
     }
   }
 
-  function updateHashForChapter(slug) {
-    if (!slug) return;
-    const encoded = encodeURIComponent(slug);
-    const desiredHash = `#novel/${encoded}`;
-    if (window.location.hash === desiredHash) {
-      return;
-    }
-    suppressHashChange = true;
-    window.location.hash = desiredHash;
-  }
-
-  function handleRoute({ initial = false } = {}) {
-    if (!chaptersReady) {
+  function applyRoute(route) {
+    if (!route) {
       return false;
     }
-    if (!chapters.length) {
-      chapters = ChaptersRepo.list();
-    }
-    const rawHash = window.location.hash;
-    if (!rawHash) {
-      return false;
-    }
-    const hash = rawHash.replace(/^#/, "");
-    if (!hash) {
-      return false;
-    }
-    if (hash === "reader") {
-      scrollToSection("reader", initial ? "auto" : "smooth");
-      return true;
-    }
-    if (hash === "writer") {
-      scrollToSection("writer", initial ? "auto" : "smooth");
-      return true;
-    }
-    if (hash.startsWith("novel/")) {
-      const slugPart = hash.slice("novel/".length);
-      if (!slugPart) {
+    const behavior = route.initial ? "auto" : "smooth";
+    switch (route.type) {
+      case "reader":
+        scrollToSection("reader", behavior);
+        return true;
+      case "writer":
+        scrollToSection("writer", behavior);
+        return true;
+      case "novel": {
+        if (!chapters.length) {
+          chapters = ChaptersRepo.list();
+        }
+        const slug = route.slug;
+        const fallbackSlug = route.encodedSlug || slug;
+        const index = (() => {
+          const fromSlug = ChaptersRepo.getIndexBySlug(slug);
+          if (typeof fromSlug === "number" && fromSlug >= 0) {
+            return fromSlug;
+          }
+          const fromFallback = ChaptersRepo.getIndexBySlug(fallbackSlug);
+          if (typeof fromFallback === "number" && fromFallback >= 0) {
+            return fromFallback;
+          }
+          return -1;
+        })();
+        if (index >= 0 && index < chapters.length) {
+          selectChapter(index, { updateHash: false });
+          scrollToSection("reader", behavior);
+          const resolvedChapter = chapters[index];
+          if (resolvedChapter) {
+            lastRoute = {
+              type: "novel",
+              slug: resolvedChapter.slug,
+              encodedSlug: encodeURIComponent(resolvedChapter.slug),
+              initial: Boolean(route.initial)
+            };
+          }
+          return true;
+        }
         return false;
       }
-      const decoded = decodeURIComponent(slugPart);
-      const index = (() => {
-        const fromDecoded = ChaptersRepo.getIndexBySlug(decoded);
-        if (typeof fromDecoded === "number" && fromDecoded >= 0) {
-          return fromDecoded;
-        }
-        return ChaptersRepo.getIndexBySlug(slugPart);
-      })();
-      if (typeof index === "number" && index >= 0 && index < chapters.length) {
-        selectChapter(index, { updateHash: false });
-        scrollToSection("reader", initial ? "auto" : "smooth");
-        return true;
-      }
+      default:
+        return false;
     }
-    return false;
   }
 
   function scrollToSection(id, behavior = "smooth") {
