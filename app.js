@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelReaderProgressTracker) {
     throw new Error("NovelReaderProgressTracker not initialised. Ensure js/reader/ProgressTracker.js is loaded before app.js");
   }
+  if (!window.NovelReaderView) {
+    throw new Error("NovelReaderView not initialised. Ensure js/reader/ReaderView.js is loaded before app.js");
+  }
   const {
     ReaderSettingsStore,
     DraftStore
@@ -16,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ChaptersRepo = window.NovelChaptersRepo;
   const ThemeService = window.NovelThemeService;
   const ProgressTrackerFactory = window.NovelReaderProgressTracker;
+  const ReaderViewFactory = window.NovelReaderView;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -107,6 +111,13 @@ document.addEventListener("DOMContentLoaded", () => {
     context: "modal"
   });
 
+  const readerView = ReaderViewFactory.create({
+    readerContainer: readerContent,
+    modalContainer: modalArticle,
+    readerTracker: readerProgressTracker,
+    modalTracker: modalProgressTracker
+  });
+
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
@@ -144,17 +155,6 @@ document.addEventListener("DOMContentLoaded", () => {
         updateHashForChapter(initialSlug);
       }
     }
-  }
-
-  function getChapterStats(chapter) {
-    return ChaptersRepo.getStats(chapter);
-  }
-
-  function formatReadingTime(minutes, words) {
-    const safeMinutes = Math.max(1, Math.round(minutes || 1));
-    const safeWords = Math.max(0, Math.round(words || 0));
-    const wordSuffix = safeWords ? ` · ${safeWords} 字` : "";
-    return `≈ ${safeMinutes} 分钟读完${wordSuffix}`;
   }
 
   // ---------- Smooth scroll ----------
@@ -290,68 +290,17 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const safeIndex = Math.max(0, Math.min(index, chapters.length - 1));
-    const chapter = chapters[safeIndex];
+    const chapter = readerView.render(safeIndex);
     if (!chapter) return;
     currentChapterIndex = safeIndex;
-    renderChapter(safeIndex);
-    renderChapter(safeIndex, modalArticle);
     highlightToc(safeIndex);
     updateModalList(safeIndex);
     syncModalTheme();
     if (updateHash) {
-      const slug = chapter.slug;
-      updateHashForChapter(slug);
+      updateHashForChapter(chapter.slug);
     }
-  }
-
-  function renderChapter(index, target = readerContent) {
-    const chapter = chapters[index];
-    if (!chapter || !target) return;
-    const slug = chapter.slug;
-    target.innerHTML = "";
-    const title = document.createElement("h3");
-    title.textContent = chapter.title;
-    target.appendChild(title);
-
-    const stats = getChapterStats(chapter);
-    const readingMeta = document.createElement("div");
-    readingMeta.className = "reading-meta";
-    const timeBadge = document.createElement("span");
-    timeBadge.className = "reading-time";
-    timeBadge.textContent = formatReadingTime(stats.minutes, stats.words);
-    readingMeta.appendChild(timeBadge);
-    target.appendChild(readingMeta);
-
-    if (target === modalArticle && chapter.summary) {
-      const summary = document.createElement("p");
-      summary.className = "chapter-summary";
-      summary.textContent = chapter.summary;
-      target.appendChild(summary);
-    }
-
-    chapter.paragraphs.forEach((paragraph) => {
-      if (typeof paragraph === "string") {
-        const p = document.createElement("p");
-        p.textContent = paragraph;
-        target.appendChild(p);
-      } else if (paragraph && paragraph.type === "blockquote") {
-        const block = document.createElement("blockquote");
-        block.textContent = paragraph.text;
-        target.appendChild(block);
-      }
-    });
-
-    if (target === readerContent) {
-      readerProgressTracker?.onChapterRendered(slug);
-    }
-
-    if (target === modalArticle) {
-      modalProgressTracker?.onChapterRendered(slug);
-    }
-
     refreshFocusTrapElements();
   }
-
   function renderToc() {
     if (!tocList) return;
     chapters = ChaptersRepo.list();
