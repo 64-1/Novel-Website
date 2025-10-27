@@ -6,13 +6,16 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelChaptersRepo) {
     throw new Error("NovelChaptersRepo not initialised. Ensure js/services/ChaptersRepo.js is loaded before app.js");
   }
+  if (!window.NovelReaderProgressTracker) {
+    throw new Error("NovelReaderProgressTracker not initialised. Ensure js/reader/ProgressTracker.js is loaded before app.js");
+  }
   const {
     ReaderSettingsStore,
-    DraftStore,
-    ProgressStore
+    DraftStore
   } = window.NovelStores;
   const ChaptersRepo = window.NovelChaptersRepo;
   const ThemeService = window.NovelThemeService;
+  const ProgressTrackerFactory = window.NovelReaderProgressTracker;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -90,14 +93,14 @@ document.addEventListener("DOMContentLoaded", () => {
     respectOverride: false
   });
 
-  readerProgressTracker = createProgressTracker({
+  readerProgressTracker = ProgressTrackerFactory.createTracker({
     container: readerContent,
     progressBar: readerProgressBar,
     progressFill: readerProgressFill,
     context: "reader"
   });
 
-  modalProgressTracker = createProgressTracker({
+  modalProgressTracker = ProgressTrackerFactory.createTracker({
     container: modalArticle,
     progressBar: modalProgressBar,
     progressFill: modalProgressFill,
@@ -644,129 +647,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .catch((error) => {
         console.warn("Service worker registration failed:", error);
       });
-  }
-
-  function createProgressTracker({ container, progressBar, progressFill, context }) {
-    if (!container || !progressBar || !progressFill) return null;
-
-    let chapterSlug = null;
-    let storedProgress = 0;
-    let lastRun = 0;
-    let trailingTimeout = null;
-    const interval = 110;
-
-    const onScroll = () => scheduleUpdate();
-    container.addEventListener("scroll", onScroll, { passive: true });
-
-    const onResize = () => refresh({ fromStorage: true });
-    window.addEventListener("resize", onResize);
-
-    let resizeObserver;
-    if (window.ResizeObserver) {
-      resizeObserver = new ResizeObserver(() => refresh());
-      resizeObserver.observe(container);
-    }
-
-    function scheduleUpdate(force = false) {
-      if (force) {
-        clearTimeout(trailingTimeout);
-        trailingTimeout = null;
-        runUpdate();
-        return;
-      }
-      const now = performance.now();
-      const remaining = interval - (now - lastRun);
-      if (remaining <= 0) {
-        clearTimeout(trailingTimeout);
-        trailingTimeout = null;
-        runUpdate();
-      } else if (!trailingTimeout) {
-        trailingTimeout = window.setTimeout(() => {
-          trailingTimeout = null;
-          runUpdate();
-        }, remaining);
-      }
-    }
-
-    function runUpdate() {
-      lastRun = performance.now();
-      const progress = getProgressFromScroll();
-      renderProgress(progress);
-      persistProgress(progress);
-    }
-
-    function getProgressFromScroll() {
-      const { maxScroll, canScroll } = getScrollMetrics();
-      if (!canScroll) {
-        return 1;
-      }
-      const raw = maxScroll <= 0 ? 1 : container.scrollTop / maxScroll;
-      return clampProgress(raw);
-    }
-
-    function getScrollMetrics() {
-      const maxScroll = Math.max(container.scrollHeight - container.clientHeight, 1);
-      const canScroll = container.scrollHeight - container.clientHeight > 0;
-      return { maxScroll, canScroll };
-    }
-
-    function renderProgress(progress) {
-      const safeProgress = clampProgress(progress);
-      const percent = safeProgress * 100;
-      progressFill.style.width = `${percent}%`;
-      progressBar.setAttribute("aria-valuenow", `${Math.round(percent)}`);
-      progressBar.setAttribute("aria-valuetext", `已阅读 ${Math.round(percent)}%`);
-    }
-
-    function persistProgress(progress) {
-      storedProgress = clampProgress(progress);
-      ProgressStore.save(chapterSlug, context, storedProgress);
-    }
-
-    function readStoredProgress() {
-      return clampProgress(ProgressStore.load(chapterSlug, context));
-    }
-
-    function applyStoredScroll() {
-      requestAnimationFrame(() => {
-        const { maxScroll, canScroll } = getScrollMetrics();
-        const targetProgress = canScroll ? storedProgress : 1;
-        const targetScroll = canScroll ? targetProgress * maxScroll : 0;
-        container.scrollTop = targetScroll;
-        renderProgress(targetProgress);
-        requestAnimationFrame(() => scheduleUpdate(true));
-      });
-    }
-
-    function onChapterRendered(slug) {
-      chapterSlug = slug;
-      storedProgress = readStoredProgress();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          applyStoredScroll();
-        });
-      });
-    }
-
-    function refresh(options = {}) {
-      const { fromStorage = false } = options;
-      if (fromStorage) {
-        storedProgress = readStoredProgress();
-        applyStoredScroll();
-      } else {
-        scheduleUpdate(true);
-      }
-    }
-
-    return {
-      onChapterRendered,
-      refresh
-    };
-  }
-
-  function clampProgress(value) {
-    if (Number.isNaN(value)) return 0;
-    return Math.min(Math.max(value, 0), 1);
   }
 
   // ---------- Writer studio ----------
