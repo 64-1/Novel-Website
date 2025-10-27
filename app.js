@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.NovelTocList) {
     throw new Error("NovelTocList not initialised. Ensure js/reader/TocList.js is loaded before app.js");
   }
+  if (!window.NovelShortcuts) {
+    throw new Error("NovelShortcuts not initialised. Ensure js/services/Shortcuts.js is loaded before app.js");
+  }
   if (!window.NovelRouter) {
     throw new Error("NovelRouter not initialised. Ensure js/router.js is loaded before app.js");
   }
@@ -36,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ProgressTrackerFactory = window.NovelReaderProgressTracker;
   const ReaderViewFactory = window.NovelReaderView;
   const TocListFactory = window.NovelTocList;
+  const Shortcuts = window.NovelShortcuts;
   const Router = window.NovelRouter;
   const ReaderModalFactory = window.NovelReaderModal;
 
@@ -158,6 +162,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  const shortcutsController = Shortcuts.init({
+    onEscape: () => {
+      if (readerModalController?.isOpen()) {
+        readerModalController.close();
+        return true;
+      }
+      return false;
+    },
+    onLeft: () => {
+      if (!chaptersReady || !chapters.length) {
+        return false;
+      }
+      if (currentChapterIndex > 0) {
+        selectChapter(currentChapterIndex - 1);
+        return true;
+      }
+      return false;
+    },
+    onRight: () => {
+      if (!chaptersReady || !chapters.length) {
+        return false;
+      }
+      if (currentChapterIndex < chapters.length - 1) {
+        selectChapter(currentChapterIndex + 1);
+        return true;
+      }
+      return false;
+    },
+    onScrollDown: () => {
+      scrollActiveContainer("down");
+      return true;
+    },
+    onScrollUp: () => {
+      scrollActiveContainer("up");
+      return true;
+    }
+  });
+
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
@@ -254,8 +296,6 @@ document.addEventListener("DOMContentLoaded", () => {
     readerLayoutBtn.textContent = readerLayoutBtn.classList.contains("active") ? "切换常规" : "切换宽屏";
     readerProgressTracker?.refresh({ fromStorage: true });
   });
-  document.addEventListener("keydown", handleGlobalKeydown);
-
   function loadReaderSettings() {
     const stored = ReaderSettingsStore.load();
     if (stored && typeof stored === "object") {
@@ -373,57 +413,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const section = document.getElementById(id);
     if (!section) return;
     section.scrollIntoView({ behavior, block: "start" });
-  }
-
-  function handleGlobalKeydown(event) {
-    if (event.defaultPrevented) return;
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-    const target = event.target;
-    const tagName = target?.tagName;
-    if (
-      target &&
-      (target.isContentEditable || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT")
-    ) {
-      return;
-    }
-
-    if (event.key === "Escape") {
-      if (readerModalController?.isOpen()) {
-        event.preventDefault();
-        readerModalController.close();
-      }
-      return;
-    }
-
-    if (!chapters.length) return;
-
-    switch (event.key) {
-      case "ArrowRight":
-        if (currentChapterIndex < chapters.length - 1) {
-          event.preventDefault();
-          selectChapter(currentChapterIndex + 1);
-        }
-        break;
-      case "ArrowLeft":
-        if (currentChapterIndex > 0) {
-          event.preventDefault();
-          selectChapter(currentChapterIndex - 1);
-        }
-        break;
-      case "j":
-      case "J":
-        event.preventDefault();
-        scrollActiveContainer("down");
-        break;
-      case "k":
-      case "K":
-        event.preventDefault();
-        scrollActiveContainer("up");
-        break;
-      default:
-        break;
-    }
   }
 
   function scrollActiveContainer(direction) {
