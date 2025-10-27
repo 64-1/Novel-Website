@@ -9,10 +9,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const {
     ReaderSettingsStore,
     DraftStore,
-    ShellThemeStore,
     ProgressStore
   } = window.NovelStores;
   const ChaptersRepo = window.NovelChaptersRepo;
+  const ThemeService = window.NovelThemeService;
 
   const themeToggleBtn = document.querySelector('[data-action="toggle-theme"]');
   const scrollButtons = document.querySelectorAll('[data-action="scroll"]');
@@ -61,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let autosaveTimer = null;
   let lastSavedSnapshot = "";
   const AUTOSAVE_DELAY = 1000;
-  let readerThemeOverride = false;
   let chaptersReady = false;
   let suppressHashChange = false;
   let lastFocusedElement = null;
@@ -81,6 +80,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const readerSettings = loadReaderSettings();
   applyReaderSettings();
 
+  ThemeService.init({ body, toggleButton: themeToggleBtn });
+  ThemeService.applyStoredShellMode();
+  ThemeService.syncReaderTheme({
+    readerSettings,
+    applyReaderSettings,
+    persistReaderSettings,
+    syncModalTheme,
+    respectOverride: false
+  });
+
   readerProgressTracker = createProgressTracker({
     container: readerContent,
     progressBar: readerProgressBar,
@@ -95,7 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
     context: "modal"
   });
 
-  initialiseShellTheme();
   loadDraftFromStorage();
   updateWordCount();
   updatePreview();
@@ -103,47 +111,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- Theme & Shell ----------
   themeToggleBtn?.addEventListener("click", () => {
-    body.classList.toggle("dark-shell");
-    const mode = getShellMode();
-    ShellThemeStore.save(mode);
-    updateShellThemeButton(mode);
-    syncReaderThemeWithShell();
+    ThemeService.toggleShellMode();
+    ThemeService.syncReaderTheme({
+      readerSettings,
+      applyReaderSettings,
+      persistReaderSettings,
+      syncModalTheme
+    });
   });
-
-  function initialiseShellTheme() {
-    const stored = ShellThemeStore.load();
-    if (stored === "dark") {
-      body.classList.add("dark-shell");
-    } else if (stored === "light") {
-      body.classList.remove("dark-shell");
-    }
-    const mode = getShellMode();
-    updateShellThemeButton(mode);
-    syncReaderThemeWithShell({ respectOverride: false });
-  }
-
-  function updateShellThemeButton(mode) {
-    if (!themeToggleBtn) return;
-    themeToggleBtn.textContent = mode === "dark" ? "日间模式" : "夜间模式";
-  }
-
-  function getShellMode() {
-    return body.classList.contains("dark-shell") ? "dark" : "light";
-  }
-
-  function syncReaderThemeWithShell({ respectOverride = true } = {}) {
-    if (respectOverride && readerThemeOverride) {
-      return;
-    }
-    const desiredTheme = getShellMode() === "dark" ? "night" : "day";
-    if (readerSettings.theme !== desiredTheme) {
-      readerSettings.theme = desiredTheme;
-      applyReaderSettings();
-      persistReaderSettings();
-      syncModalTheme();
-    }
-    readerThemeOverride = false;
-  }
 
   async function initChapters() {
     await ChaptersRepo.load();
@@ -220,11 +195,12 @@ document.addEventListener("DOMContentLoaded", () => {
   readerThemeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       const selectedTheme = btn.dataset.theme || "day";
-      readerSettings.theme = selectedTheme;
-      readerThemeOverride = selectedTheme !== (getShellMode() === "dark" ? "night" : "day");
-      applyReaderSettings();
-      persistReaderSettings();
-      syncModalTheme();
+      ThemeService.handleReaderThemeSelection(selectedTheme, {
+        readerSettings,
+        applyReaderSettings,
+        persistReaderSettings,
+        syncModalTheme
+      });
     });
   });
 
