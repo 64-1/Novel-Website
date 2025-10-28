@@ -52,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const bookmarksDrawerList = document.getElementById("bookmarks-drawer-list");
   const drawerTabs = document.querySelectorAll(".drawer-tab");
   const drawerCloseElements = document.querySelectorAll('[data-action="close-drawer"]');
+  const fabAddBookmark = document.getElementById("fab-add-bookmark");
+  const bookmarkToast = document.getElementById("bookmark-toast");
 
   let currentChapterIndex = 0;
   let readerProgressTracker;
@@ -72,6 +74,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectionPopoverTimeout = null;
   let drawerFilter = "all";
   let annotationStoreUnsubscribe = null;
+  let fabScrollTimeout = null;
+  let fabVisible = true;
+  let lastScrollTop = 0;
 
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
   if (initialQuerySlug) {
@@ -121,6 +126,26 @@ document.addEventListener("DOMContentLoaded", () => {
     modalTracker: modalProgressTracker
   });
 
+  // FAB functions (need to be defined before modal callbacks)
+  function showFAB() {
+    if (!fabAddBookmark || !chaptersReady || !chapters.length) return;
+    // Don't show if drawer is open
+    if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false") return;
+    // Don't show if modal is open
+    if (readerModalController?.isOpen()) return;
+    // Don't show if search input is focused
+    if (searchInput && document.activeElement === searchInput) return;
+
+    fabVisible = true;
+    fabAddBookmark.setAttribute("aria-hidden", "false");
+  }
+
+  function hideFAB() {
+    if (!fabAddBookmark) return;
+    fabVisible = false;
+    fabAddBookmark.setAttribute("aria-hidden", "true");
+  }
+
   readerModalController = readerModalElement
     ? createReaderModal({
         modalElement: readerModalElement,
@@ -128,7 +153,17 @@ document.addEventListener("DOMContentLoaded", () => {
         openButton: openReaderBtn,
         closeElements: modalCloseElements,
         progressTracker: modalProgressTracker,
-        syncTheme: syncModalTheme
+        syncTheme: syncModalTheme,
+        onOpen: () => {
+          hideFAB();
+        },
+        onClose: () => {
+          setTimeout(() => {
+            if (!fabVisible && chaptersReady && chapters.length) {
+              showFAB();
+            }
+          }, 200);
+        }
       })
     : null;
 
@@ -809,12 +844,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Drawer trigger and close
   bookmarksDrawerTrigger?.addEventListener("click", () => {
+    hideFAB();
     openBookmarksDrawer();
   });
 
   drawerCloseElements.forEach((el) => {
     el.addEventListener("click", () => {
       closeBookmarksDrawer();
+      setTimeout(() => {
+        if (!fabVisible && chaptersReady && chapters.length) {
+          showFAB();
+        }
+      }, 200);
     });
   });
 
@@ -865,11 +906,115 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function handleFABScroll() {
+    if (!fabAddBookmark || !readerContent) return;
+
+    const currentScrollTop = readerContent.scrollTop;
+    const isScrollingDown = currentScrollTop > lastScrollTop;
+    lastScrollTop = currentScrollTop;
+
+    // Hide FAB while scrolling down
+    if (isScrollingDown && fabVisible) {
+      hideFAB();
+    }
+
+    // Show FAB after scroll idle (600ms)
+    clearTimeout(fabScrollTimeout);
+    fabScrollTimeout = setTimeout(() => {
+      if (fabVisible === false) {
+        showFAB();
+      }
+    }, 600);
+  }
+
+  function showBookmarkToast(message) {
+    if (!bookmarkToast) return;
+    bookmarkToast.textContent = message;
+    bookmarkToast.setAttribute("aria-hidden", "false");
+
+    clearTimeout(window.bookmarkToastTimeout);
+    window.bookmarkToastTimeout = setTimeout(() => {
+      bookmarkToast.setAttribute("aria-hidden", "true");
+    }, 2500);
+  }
+
+  function handleFABClick() {
+    if (!chaptersReady || !chapters.length || !annotationsController) return;
+    const chapter = chapters[currentChapterIndex];
+    if (!chapter) return;
+
+    // Get current scroll progress
+    const container = readerContent;
+    const maxScroll = Math.max(container.scrollHeight - container.clientHeight, 1);
+    const percent = maxScroll > 0 ? container.scrollTop / maxScroll : 0;
+    const scrollTop = container.scrollTop;
+
+    // Prompt for optional note
+    const noteInput = window.prompt(Strings.annotations.fab.addNoteOptional, "");
+    if (noteInput === null) {
+      // User cancelled - don't proceed
+      return;
+    }
+
+    const bookmark = annotationsController.createBookmark({
+      slug: chapter.slug,
+      percent,
+      scrollTop,
+      note: noteInput ? noteInput.trim() : ""
+    });
+
+    if (bookmark) {
+      // Update panels
+      updateAnnotationsPanel(chapter.slug);
+      if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false") {
+        renderBookmarksDrawer();
+      }
+
+      // Show toast
+      const chapterNum = currentChapterIndex + 1;
+      const percentRounded = Math.round(percent * 100);
+      const toastMessage = Strings.annotations.fab.bookmarkAdded(chapterNum, percentRounded);
+      showBookmarkToast(toastMessage);
+    }
+  }
+
+  // FAB scroll detection
+  if (readerContent && fabAddBookmark) {
+    readerContent.addEventListener("scroll", handleFABScroll, { passive: true });
+    // Show FAB initially
+    setTimeout(() => {
+      if (chaptersReady && chapters.length) {
+        showFAB();
+      }
+    }, 500);
+  }
+
+  // FAB click handler
+  fabAddBookmark?.addEventListener("click", handleFABClick);
+
+  // Hide FAB when search input is focused
+  if (searchInput) {
+    searchInput.addEventListener("focus", () => {
+      hideFAB();
+    });
+    searchInput.addEventListener("blur", () => {
+      if (fabVisible === false) {
+        setTimeout(() => showFAB(), 300);
+      }
+    });
+  }
+
+
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       readerView.clearCache?.();
       preparedNextSlug = null;
       preparedPrevSlug = null;
+    } else {
+      // Show FAB when page becomes visible again
+      if (chaptersReady && chapters.length) {
+        setTimeout(() => showFAB(), 300);
+      }
     }
   });
 
@@ -1005,6 +1150,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!initialHandled) {
       selectChapter(currentChapterIndex, { updateHash: true });
     }
+
+    // Show FAB after chapters are loaded
+    setTimeout(() => {
+      if (!fabVisible && chaptersReady && chapters.length) {
+        showFAB();
+      }
+    }, 600);
   }
 
   function selectChapter(index, options = {}) {
@@ -1042,6 +1194,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false" && drawerFilter === "current") {
       renderBookmarksDrawer();
     }
+
+    // Show FAB after chapter loads (if not visible)
+    setTimeout(() => {
+      if (!fabVisible && chaptersReady && chapters.length) {
+        showFAB();
+      }
+    }, 400);
 
     // Check for pending bookmark scroll
     checkPendingBookmarkScroll();

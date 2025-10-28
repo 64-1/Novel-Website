@@ -31,6 +31,11 @@ const Strings = {
       locate: "定位",
       emptyAll: "暂无书签",
       emptyCurrent: "本章暂无书签"
+    },
+    fab: {
+      addBookmark: "添加书签",
+      addNoteOptional: "添加备注（可选）",
+      bookmarkAdded: (chapterNum, percent) => `已添加书签 · 第 ${chapterNum} 章 · ${percent}%`
     }
   }
 };
