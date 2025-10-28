@@ -149,8 +149,55 @@ export const LastReadStore = {
 export const AnnotationStore = {
   KEY_BOOKMARKS: "novel:ann:bookmarks:v1",
   KEY_HIGHLIGHTS: "novel:ann:highlights:v1",
+  _subscribers: [],
+
+  // Subscribe/unsubscribe for pub-sub
+  subscribe(fn) {
+    if (typeof fn !== "function") return () => {};
+    this._subscribers.push(fn);
+    return () => {
+      const index = this._subscribers.indexOf(fn);
+      if (index >= 0) {
+        this._subscribers.splice(index, 1);
+      }
+    };
+  },
+
+  unsubscribe(fn) {
+    const index = this._subscribers.indexOf(fn);
+    if (index >= 0) {
+      this._subscribers.splice(index, 1);
+    }
+  },
+
+  _notify() {
+    this._subscribers.forEach((fn) => {
+      try {
+        fn();
+      } catch (error) {
+        console.warn("[AnnotationStore] Subscriber error:", error);
+      }
+    });
+  },
 
   // Bookmarks
+  getAllBookmarks() {
+    const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
+    if (!Array.isArray(all)) return [];
+    const validated = all.filter((bm) => {
+      return (
+        bm &&
+        typeof bm === "object" &&
+        typeof bm.id === "string" &&
+        typeof bm.slug === "string" &&
+        typeof bm.percent === "number" &&
+        bm.percent >= 0 &&
+        bm.percent <= 1
+      );
+    });
+    return validated.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+
   getBookmarks(slug) {
     const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
     if (!Array.isArray(all)) return [];
@@ -193,6 +240,7 @@ export const AnnotationStore = {
       const filtered = all.filter((item) => item.id !== bm.id);
       filtered.push(bm);
       storage.setItem(this.KEY_BOOKMARKS, JSON.stringify(filtered));
+      this._notify();
       return true;
     } catch (error) {
       console.warn("[AnnotationStore] Failed to add bookmark.", error);
@@ -208,6 +256,7 @@ export const AnnotationStore = {
       const filtered = all.filter((item) => item.id !== id);
       if (filtered.length === all.length) return false; // Nothing removed
       storage.setItem(this.KEY_BOOKMARKS, JSON.stringify(filtered));
+      this._notify();
       return true;
     } catch (error) {
       console.warn("[AnnotationStore] Failed to remove bookmark.", error);

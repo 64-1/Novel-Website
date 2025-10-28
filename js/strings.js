@@ -23,7 +23,15 @@ const Strings = {
     noBookmarks: "暂无书签",
     noHighlights: "暂无高亮",
     delete: "删除",
-    jumpTo: "跳转到"
+    jumpTo: "跳转到",
+    drawer: {
+      title: "书签",
+      all: "全部",
+      currentChapter: "本章",
+      locate: "定位",
+      emptyAll: "暂无书签",
+      emptyCurrent: "本章暂无书签"
+    }
   }
 };
 

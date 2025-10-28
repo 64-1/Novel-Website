@@ -47,6 +47,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const bookmarkCount = document.getElementById("bookmark-count");
   const highlightCount = document.getElementById("highlight-count");
   const annTabs = document.querySelectorAll(".ann-tab");
+  const bookmarksDrawerTrigger = document.getElementById("bookmarks-drawer-trigger");
+  const bookmarksDrawer = document.getElementById("bookmarks-drawer");
+  const bookmarksDrawerList = document.getElementById("bookmarks-drawer-list");
+  const drawerTabs = document.querySelectorAll(".drawer-tab");
+  const drawerCloseElements = document.querySelectorAll('[data-action="close-drawer"]');
 
   let currentChapterIndex = 0;
   let readerProgressTracker;
@@ -65,6 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let annotationsController = null;
   let currentAnnTab = "bookmarks";
   let selectionPopoverTimeout = null;
+  let drawerFilter = "all";
+  let annotationStoreUnsubscribe = null;
 
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
   if (initialQuerySlug) {
@@ -133,6 +140,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initShortcuts({
     onEscape: () => {
+      if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false") {
+        bookmarksDrawer.setAttribute("aria-hidden", "true");
+        return true;
+      }
       if (readerModalController?.isOpen()) {
         readerModalController.close();
         return true;
@@ -632,6 +643,228 @@ document.addEventListener("DOMContentLoaded", () => {
     return div.innerHTML;
   }
 
+  // Bookmarks Drawer
+  function openBookmarksDrawer() {
+    if (!bookmarksDrawer) return;
+    bookmarksDrawer.setAttribute("aria-hidden", "false");
+    renderBookmarksDrawer();
+  }
+
+  function closeBookmarksDrawer() {
+    if (!bookmarksDrawer) return;
+    bookmarksDrawer.setAttribute("aria-hidden", "true");
+  }
+
+  function formatRelativeTime(timestamp) {
+    if (!timestamp || typeof timestamp !== "number") return "";
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) return "刚刚";
+    if (minutes < 60) return `${minutes} 分钟前`;
+    if (hours < 24) return `${hours} 小时前`;
+    if (days < 7) return `${days} 天前`;
+    return new Date(timestamp).toLocaleDateString("zh-CN", {
+      month: "short",
+      day: "numeric"
+    });
+  }
+
+  function renderBookmarksDrawer() {
+    if (!bookmarksDrawerList || !chaptersReady || !chapters.length) return;
+
+    const allBookmarks = AnnotationStore.getAllBookmarks();
+    const currentChapter = chapters[currentChapterIndex];
+    const currentSlug = currentChapter?.slug || "";
+
+    // Filter based on drawerFilter
+    let displayedBookmarks = allBookmarks;
+    if (drawerFilter === "current") {
+      displayedBookmarks = allBookmarks.filter((bm) => bm.slug === currentSlug);
+    }
+
+    bookmarksDrawerList.innerHTML = "";
+
+    if (displayedBookmarks.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "drawer-empty";
+      empty.textContent =
+        drawerFilter === "current"
+          ? Strings.annotations.drawer.emptyCurrent
+          : Strings.annotations.drawer.emptyAll;
+      bookmarksDrawerList.appendChild(empty);
+      return;
+    }
+
+    displayedBookmarks.forEach((bookmark) => {
+      const chapter = chapters.find((ch) => ch.slug === bookmark.slug) || null;
+      const chapterTitle = chapter?.title || bookmark.slug;
+      const isCurrentChapter = bookmark.slug === currentSlug;
+
+      const item = document.createElement("div");
+      item.className = "drawer-bookmark-item";
+      item.dataset.bookmarkId = bookmark.id;
+      item.setAttribute("role", "listitem");
+      item.setAttribute("tabindex", "0");
+
+      const percent = Math.round(bookmark.percent * 100);
+      const timeStr = formatRelativeTime(bookmark.createdAt);
+
+      item.innerHTML = `
+        <div class="drawer-bookmark-content">
+          <div class="drawer-bookmark-title">${escapeHtml(chapterTitle)}</div>
+          ${bookmark.note ? `<div class="drawer-bookmark-note">${escapeHtml(bookmark.note)}</div>` : ""}
+          <div class="drawer-bookmark-meta">
+            <span>${percent}%</span>
+            <span>·</span>
+            <span>${timeStr}</span>
+          </div>
+        </div>
+        <div class="drawer-bookmark-actions">
+          <button class="drawer-bookmark-locate" data-action="locate" aria-label="${Strings.annotations.drawer.locate}">›</button>
+          <button class="drawer-bookmark-delete" data-action="delete-drawer" aria-label="${Strings.annotations.delete}">🗑</button>
+        </div>
+      `;
+
+      bookmarksDrawerList.appendChild(item);
+    });
+  }
+
+  // Drawer list click handlers (delegated, set up once)
+  if (bookmarksDrawerList) {
+    bookmarksDrawerList.addEventListener("click", (e) => {
+      const item = e.target.closest(".drawer-bookmark-item");
+      if (!item) return;
+      const bookmarkId = item.dataset.bookmarkId;
+      const action = e.target.closest("[data-action]")?.dataset.action;
+
+      if (action === "delete-drawer") {
+        e.stopPropagation();
+        if (AnnotationStore.removeBookmark(bookmarkId)) {
+          renderBookmarksDrawer();
+          // Also update annotation panel if on current chapter
+          if (chaptersReady && chapters.length) {
+            const chapter = chapters[currentChapterIndex];
+            if (chapter) {
+              updateAnnotationsPanel(chapter.slug);
+            }
+          }
+        }
+        return;
+      }
+
+      if (action === "locate" || !action) {
+        const bookmark = AnnotationStore.getAllBookmarks().find((bm) => bm.id === bookmarkId);
+        if (!bookmark) return;
+
+        const currentChapter = chapters[currentChapterIndex];
+        const currentSlug = currentChapter?.slug || "";
+
+        if (bookmark.slug === currentSlug) {
+          // Same chapter - scroll to position
+          if (annotationsController) {
+            annotationsController.jumpToBookmark(bookmarkId, readerContent);
+          } else {
+            // Fallback: scroll manually
+            const container = readerContent;
+            const maxScroll = Math.max(container.scrollHeight - container.clientHeight, 1);
+            const targetScroll = bookmark.percent * maxScroll;
+            container.scrollTo({
+              top: targetScroll,
+              behavior: "smooth"
+            });
+          }
+        } else {
+          // Different chapter - navigate
+          const url = `read.html#novel/${encodeURIComponent(bookmark.slug)}`;
+          const targetPercent = bookmark.percent;
+          const targetScrollTop = bookmark.scrollTop;
+
+          // Store scroll target to apply after render
+          sessionStorage.setItem(
+            "pendingBookmarkScroll",
+            JSON.stringify({ percent: targetPercent, scrollTop: targetScrollTop })
+          );
+
+          location.href = url;
+        }
+      }
+    });
+  }
+
+  // Drawer tab switching
+  drawerTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const filter = tab.dataset.filter;
+      if (!filter) return;
+      drawerFilter = filter;
+      drawerTabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      renderBookmarksDrawer();
+    });
+  });
+
+  // Drawer trigger and close
+  bookmarksDrawerTrigger?.addEventListener("click", () => {
+    openBookmarksDrawer();
+  });
+
+  drawerCloseElements.forEach((el) => {
+    el.addEventListener("click", () => {
+      closeBookmarksDrawer();
+    });
+  });
+
+  // Subscribe to annotation store changes
+  if (AnnotationStore.subscribe) {
+    annotationStoreUnsubscribe = AnnotationStore.subscribe(() => {
+      if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false") {
+        renderBookmarksDrawer();
+      }
+      // Also update annotation panel if needed
+      if (chaptersReady && chapters.length) {
+        const chapter = chapters[currentChapterIndex];
+        if (chapter) {
+          updateAnnotationsPanel(chapter.slug);
+        }
+      }
+    });
+  }
+
+  // Check for pending bookmark scroll after chapter load
+  function checkPendingBookmarkScroll() {
+    try {
+      const stored = sessionStorage.getItem("pendingBookmarkScroll");
+      if (!stored) return;
+      const { percent, scrollTop } = JSON.parse(stored);
+      sessionStorage.removeItem("pendingBookmarkScroll");
+
+      // Wait for render to complete
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const container = readerContent;
+          if (!container) return;
+          const maxScroll = Math.max(container.scrollHeight - container.clientHeight, 1);
+          let targetScroll = 0;
+          if (typeof scrollTop === "number" && scrollTop >= 0) {
+            targetScroll = Math.min(scrollTop, maxScroll);
+          } else if (typeof percent === "number") {
+            targetScroll = percent * maxScroll;
+          }
+          container.scrollTo({
+            top: targetScroll,
+            behavior: "smooth"
+          });
+        });
+      });
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       readerView.clearCache?.();
@@ -804,6 +1037,14 @@ document.addEventListener("DOMContentLoaded", () => {
       annotationsController.applyForChapter(chapter.slug);
       updateAnnotationsPanel(chapter.slug);
     }
+
+    // Update drawer if open and filter is "current"
+    if (bookmarksDrawer && bookmarksDrawer.getAttribute("aria-hidden") === "false" && drawerFilter === "current") {
+      renderBookmarksDrawer();
+    }
+
+    // Check for pending bookmark scroll
+    checkPendingBookmarkScroll();
 
     // Apply pending search query if present
     if (pendingSearchQuery && searchInput && searchController) {

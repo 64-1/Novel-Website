@@ -25,6 +25,7 @@
       </nav>
       <div class="header-actions">
         <button class="btn ghost" data-action="open-global-search" aria-label="搜索全书">搜索</button>
+        <button class="btn ghost" id="bookmarks-drawer-trigger" aria-label="书签">书签</button>
         <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
       </div>
     </div>
@@ -121,6 +122,23 @@
       <div class="modal-reader">
         <aside class="modal-toc"></aside>
         <article class="modal-article"></article>
+      </div>
+    </div>
+  </div>
+
+  <div class="bookmarks-drawer" id="bookmarks-drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-action="close-drawer"></div>
+    <div class="drawer-content" role="dialog" aria-modal="true" aria-label="书签列表">
+      <div class="drawer-header">
+        <h3>书签</h3>
+        <button class="drawer-close" data-action="close-drawer" aria-label="关闭">×</button>
+      </div>
+      <div class="drawer-tabs">
+        <button class="drawer-tab active" data-filter="all">全部</button>
+        <button class="drawer-tab" data-filter="current">本章</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-list" id="bookmarks-drawer-list" role="list" aria-live="polite"></div>
       </div>
     </div>
   </div>
