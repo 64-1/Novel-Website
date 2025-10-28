@@ -1,4 +1,4 @@
-const CACHE_VERSION = "xinghai-static-v5";
+const CACHE_VERSION = "xinghai-static-v6";
 const CACHE_NAME = `xinghai-static-${CACHE_VERSION}`;
 const ASSETS = [
   "./",
@@ -71,11 +71,11 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    if (requestUrl.pathname.startsWith("/novel/")) {
+    if (/^\/novel\/[^/]+\/?$/.test(requestUrl.pathname)) {
       event.respondWith(
-        caches.open(CACHE_NAME).then((cache) =>
-          cache.match("./read.html").then((cachedResponse) => cachedResponse || fetch(request))
-        )
+        caches
+          .match("/read.html")
+          .then((cachedResponse) => cachedResponse || fetch("/read.html"))
       );
       return;
     }

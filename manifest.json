@@ -1,7 +1,8 @@
 {
   "name": "星海小说",
   "short_name": "星海小说",
-  "start_url": "./index.html",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f5f7fb",
   "theme_color": "#3a70ff",

@@ -357,7 +357,7 @@ export function initApp({
       if (!routeHandled) {
         const initialSlug = chaptersRepo.getSlugByIndex(currentChapterIndex);
         if (!window.location.hash || window.location.hash.startsWith("#novel/")) {
-          router.linkToChapter(initialSlug);
+          router.linkToChapter(initialSlug, { mode: "hash" });
           lastRoute = {
             type: "novel",
             slug: initialSlug,
@@ -427,7 +427,7 @@ export function initApp({
       preparedPrevSlug = null;
       prepareAdjacentChapters(safeIndex);
       if (updateHash) {
-        router.linkToChapter(chapter.slug);
+        router.linkToChapter(chapter.slug, { mode: "hash" });
         lastRoute = {
           type: "novel",
           slug: chapter.slug,

@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const { createGlobalSearch } = await import("./search/GlobalSearch.js");
     globalSearchController = createGlobalSearch({
       onNavigate: (slug, query) => {
-        const url = `read.html#novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
+        const url = `/novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
         location.href = url;
       },
       strings: Strings.search
@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const progress = ProgressStore.load(record.slug) || 0;
     const percent = Math.round(Math.max(0, Math.min(progress, 1)) * 100);
-    const href = `read.html#novel/${encodeURIComponent(record.slug)}`;
+    const href = `/novel/${encodeURIComponent(record.slug)}`;
 
     const card = document.createElement("div");
     card.className = "sidebar-card continue-reading-card";

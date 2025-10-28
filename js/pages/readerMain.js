@@ -78,9 +78,25 @@ document.addEventListener("DOMContentLoaded", () => {
   let fabVisible = true;
   let lastScrollTop = 0;
 
+  const initialPathSlug = pathSlug();
+  const initialHashSlug = getHashSlug(window.location.hash);
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
-  if (initialQuerySlug) {
-    replaceUrlWithHash(initialQuerySlug);
+  const canonicalSlug = initialPathSlug || initialHashSlug || initialQuerySlug;
+  const searchParams = new URLSearchParams(window.location.search);
+  const hasChapterParam = searchParams.has("chapter");
+
+  if (canonicalSlug) {
+    const needsCanonicalPath =
+      !initialPathSlug || initialPathSlug !== canonicalSlug || hasChapterParam || Boolean(initialHashSlug);
+    if (needsCanonicalPath) {
+      replaceUrlWithPath(canonicalSlug, searchParams);
+    }
+  } else if (hasChapterParam) {
+    searchParams.delete("chapter");
+    const serialized = searchParams.toString();
+    const url = new URL(window.location.href);
+    url.search = serialized ? `?${serialized}` : "";
+    history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
 
   // Extract search query from URL
@@ -814,7 +830,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } else {
           // Different chapter - navigate
-          const url = `read.html#novel/${encodeURIComponent(bookmark.slug)}`;
+          const url = `/novel/${encodeURIComponent(bookmark.slug)}`;
           const targetPercent = bookmark.percent;
           const targetScrollTop = bookmark.scrollTop;
 
@@ -1018,13 +1034,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-    // Initialize global search overlay
+  // Initialize global search overlay
   (async () => {
     const { createGlobalSearch } = await import("../search/GlobalSearch.js");
     globalSearchController = createGlobalSearch({
       onNavigate: (slug, query) => {
         // Navigate within same page
-        const url = `read.html#novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
+        const url = `/novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
         location.href = url;
       },
       strings: Strings.search
@@ -1217,7 +1233,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (updateHash) {
-      linkToChapter(chapter.slug);
+      linkToChapter(chapter.slug, { mode: "path" });
       lastRoute = {
         type: "novel",
         slug: chapter.slug,
@@ -1283,6 +1299,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id)?.scrollIntoView({ behavior, block: "start" });
   }
 
+  function pathSlug() {
+    const match = window.location.pathname.match(/^\/novel\/([^/?#]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function getHashSlug(rawHash) {
+    if (!rawHash) return null;
+    const match = rawHash.match(/^#novel\/([^/?#]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
   function getChapterSlugFromQuery(search) {
     const params = new URLSearchParams(search);
     const value = params.get("chapter");
@@ -1294,12 +1321,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function replaceUrlWithHash(slug) {
+  function replaceUrlWithPath(slug, params) {
     if (!slug) return;
     const url = new URL(window.location.href);
-    url.searchParams.delete("chapter");
-    url.hash = `#novel/${encodeURIComponent(slug)}`;
-    history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    url.pathname = `/novel/${encodeURIComponent(slug)}`;
+    url.hash = "";
+    const nextParams =
+      params instanceof URLSearchParams ? new URLSearchParams(params.toString()) : new URLSearchParams(url.search);
+    nextParams.delete("chapter");
+    const serialized = nextParams.toString();
+    url.search = serialized ? `?${serialized}` : "";
+    history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
 
   function resolveLastRead() {
