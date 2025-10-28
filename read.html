@@ -56,6 +56,19 @@
             </div>
             <small data-reading-time>预计剩余阅读时间：--</small>
           </div>
+          <div class="annotations-panel">
+            <div class="annotations-tabs">
+              <button class="ann-tab active" data-tab="bookmarks" aria-label="书签">
+                <span>书签</span>
+                <span class="ann-count" id="bookmark-count">0</span>
+              </button>
+              <button class="ann-tab" data-tab="highlights" aria-label="高亮">
+                <span>高亮</span>
+                <span class="ann-count" id="highlight-count">0</span>
+              </button>
+            </div>
+            <div class="annotations-list" id="annotations-list" role="list" aria-live="polite"></div>
+          </div>
         </aside>
         <article class="reader-panel">
           <header class="reader-toolbar">
@@ -72,6 +85,9 @@
               <button class="pill" data-theme="dusk">暮色</button>
               <button class="pill" data-theme="night">星夜</button>
             </div>
+            <div class="toolbar-group annotation-actions">
+              <button id="add-bookmark" class="btn ghost small" data-action="add-bookmark" aria-label="添加书签">书签</button>
+            </div>
             <div class="toolbar-group reader-search">
               <label class="visually-hidden" for="chap-search">搜索本章</label>
               <input id="chap-search" type="search" placeholder="搜索本章…" autocomplete="off" spellcheck="false">
@@ -84,6 +100,10 @@
             </div>
           </header>
           <div class="reader-content" data-theme="day"></div>
+          <div class="selection-popover" id="selection-popover" aria-hidden="true" role="toolbar">
+            <button id="highlight-selection" class="btn small" aria-label="高亮选中文本">高亮</button>
+            <button id="add-note" class="btn small secondary" aria-label="添加备注">备注</button>
+          </div>
         </article>
       </div>
     </section>

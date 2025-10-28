@@ -13,6 +13,17 @@ const Strings = {
     placeholder: "搜索全书…",
     noResults: "无结果",
     chaptersMatched: (count) => `共 ${count} 章命中`
+  },
+  annotations: {
+    addBookmark: "添加书签",
+    bookmarks: "书签",
+    highlights: "高亮",
+    highlight: "高亮",
+    addNote: "备注",
+    noBookmarks: "暂无书签",
+    noHighlights: "暂无高亮",
+    delete: "删除",
+    jumpTo: "跳转到"
   }
 };
 
