@@ -1,11 +1,13 @@
-const CACHE_VERSION = "xinghai-static-v3";
+const CACHE_VERSION = "xinghai-static-v4";
 const CACHE_NAME = `xinghai-static-${CACHE_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
+  "./read.html",
   "./styles.css",
   "./js/main.js",
   "./js/app/initApp.js",
+  "./js/pages/readerMain.js",
   "./js/services/Stores.js",
   "./js/services/ChaptersRepo.js",
   "./js/services/ThemeService.js",
@@ -65,6 +67,17 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(request.url);
   if (requestUrl.origin !== location.origin) {
     return;
+  }
+
+  if (request.mode === "navigate") {
+    if (requestUrl.pathname.startsWith("/novel/")) {
+      event.respondWith(
+        caches.open(CACHE_NAME).then((cache) =>
+          cache.match("./read.html").then((cachedResponse) => cachedResponse || fetch(request))
+        )
+      );
+      return;
+    }
   }
 
   event.respondWith(
