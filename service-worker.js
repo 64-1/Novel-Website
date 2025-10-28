@@ -1,4 +1,5 @@
-const CACHE_NAME = "xinghai-static-v2";
+const CACHE_VERSION = "xinghai-static-v3";
+const CACHE_NAME = `xinghai-static-${CACHE_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
@@ -42,7 +43,16 @@ self.addEventListener("activate", (event) => {
             .map((key) => caches.delete(key))
         )
       )
-      .then(() => self.clients.claim())
+      .then(async () => {
+        await self.clients.claim();
+        const clients = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
+        clients.forEach((client) => {
+          client.postMessage({
+            type: "SW_ACTIVATED",
+            version: CACHE_VERSION
+          });
+        });
+      })
   );
 });
 
