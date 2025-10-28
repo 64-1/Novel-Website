@@ -41,6 +41,47 @@ initApp({
 });
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Initialize global search overlay
+  let globalSearchController = null;
+  (async () => {
+    const { createGlobalSearch } = await import("./search/GlobalSearch.js");
+    globalSearchController = createGlobalSearch({
+      onNavigate: (slug, query) => {
+        const url = `read.html#novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
+        location.href = url;
+      },
+      strings: Strings.search
+    });
+    // Set chapters repo getter for lazy loading during search
+    globalSearchController.setChaptersRepoGetter(() => ChaptersRepo);
+
+    // Add Ctrl/⌘ K shortcut handler
+    document.addEventListener("keydown", (event) => {
+      if (event.defaultPrevented) return;
+      const isModKey = event.metaKey || event.ctrlKey;
+      const isK = event.key === "k" || event.key === "K";
+      
+      if (isModKey && isK && !event.altKey) {
+        // Only open if overlay is not already open
+        if (!globalSearchController?.isOpen()) {
+          event.preventDefault();
+          // Ensure chapters are loaded before opening
+          ChaptersRepo.load().then(() => {
+            globalSearchController?.open(ChaptersRepo);
+          });
+        }
+      }
+    });
+
+    // Add click handler for search button
+    const searchButton = document.querySelector('[data-action="open-global-search"]');
+    searchButton?.addEventListener("click", () => {
+      ChaptersRepo.load().then(() => {
+        globalSearchController?.open(ChaptersRepo);
+      });
+    });
+  })();
+
   const slot = document.getElementById("continue-reading-slot");
   if (!slot) {
     return;

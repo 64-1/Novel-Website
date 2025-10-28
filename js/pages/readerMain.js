@@ -51,10 +51,19 @@ document.addEventListener("DOMContentLoaded", () => {
   let preparedPrevSlug = null;
   let searchController = null;
   let searchDebounce = null;
+  let globalSearchController = null;
+  let pendingSearchQuery = null;
 
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
   if (initialQuerySlug) {
     replaceUrlWithHash(initialQuerySlug);
+  }
+
+  // Extract search query from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialQuery = urlParams.get("q");
+  if (initialQuery) {
+    pendingSearchQuery = initialQuery.trim();
   }
 
   const readerSettings = loadReaderSettings();
@@ -290,6 +299,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+    // Initialize global search overlay
+  (async () => {
+    const { createGlobalSearch } = await import("../search/GlobalSearch.js");
+    globalSearchController = createGlobalSearch({
+      onNavigate: (slug, query) => {
+        // Navigate within same page
+        const url = `read.html#novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
+        location.href = url;
+      },
+      strings: Strings.search
+    });
+    // Set chapters repo getter for lazy loading during search
+    globalSearchController.setChaptersRepoGetter(() => ChaptersRepo);
+
+    // Add Ctrl/⌘ K shortcut handler (only when overlay not open)
+    document.addEventListener("keydown", (event) => {
+      if (event.defaultPrevented) return;
+      const isModKey = event.metaKey || event.ctrlKey;
+      const isK = event.key === "k" || event.key === "K";
+      
+      if (isModKey && isK && !event.altKey) {
+        // Only open if overlay is not already open and not in editable target
+        const target = event.target;
+        if (
+          !target ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        if (!globalSearchController?.isOpen()) {
+          event.preventDefault();
+          // Ensure chapters are loaded before opening
+          ChaptersRepo.load().then(() => {
+            globalSearchController?.open(ChaptersRepo);
+          });
+        }
+      }
+    });
+
+    // Add click handler for search button
+    const searchButton = document.querySelector('[data-action="open-global-search"]');
+    searchButton?.addEventListener("click", () => {
+      ChaptersRepo.load().then(() => {
+        globalSearchController?.open(ChaptersRepo);
+      });
+    });
+  })();
+
   loadChapters();
 
   function loadReaderSettings() {
@@ -396,6 +455,17 @@ document.addEventListener("DOMContentLoaded", () => {
     searchController?.onChapterChanged();
     if (!searchInput || !searchInput.value.trim()) {
       updateSearchStatus();
+    }
+
+    // Apply pending search query if present
+    if (pendingSearchQuery && searchInput && searchController) {
+      searchInput.value = pendingSearchQuery;
+      searchController.setQuery(pendingSearchQuery);
+      // Jump to first hit
+      setTimeout(() => {
+        searchController?.next();
+      }, 100);
+      pendingSearchQuery = null; // Clear after applying
     }
 
     if (updateHash) {
