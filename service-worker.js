@@ -1,4 +1,4 @@
-const CACHE_VERSION = "xinghai-static-v4";
+const CACHE_VERSION = "xinghai-static-v5";
 const CACHE_NAME = `xinghai-static-${CACHE_VERSION}`;
 const ASSETS = [
   "./",
@@ -15,6 +15,7 @@ const ASSETS = [
   "./js/reader/ProgressTracker.js",
   "./js/reader/ReaderView.js",
   "./js/reader/TocList.js",
+  "./js/reader/SearchInChapter.js",
   "./js/modal/ReaderModal.js",
   "./js/a11y/FocusTrap.js",
   "./js/router.js",

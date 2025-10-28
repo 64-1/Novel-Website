@@ -28,12 +28,14 @@ function renderParagraph(target, paragraph) {
   }
 }
 
-function createChapterFragment(chapter, { includeSummary = false } = {}) {
-  const fragment = document.createDocumentFragment();
+function renderChapterContent(target, chapter, { includeSummary = false } = {}) {
+  if (!target || !chapter) return;
+  target.innerHTML = "";
+  target.dataset.slug = chapter.slug;
 
   const title = document.createElement("h3");
   title.textContent = chapter.title;
-  fragment.appendChild(title);
+  target.appendChild(title);
 
   const stats = ChaptersRepo.getStats(chapter);
   const readingMeta = document.createElement("div");
@@ -42,26 +44,16 @@ function createChapterFragment(chapter, { includeSummary = false } = {}) {
   timeBadge.className = "reading-time";
   timeBadge.textContent = formatReadingTime(stats.minutes, stats.words);
   readingMeta.appendChild(timeBadge);
-  fragment.appendChild(readingMeta);
+  target.appendChild(readingMeta);
 
   if (includeSummary && chapter.summary) {
     const summary = document.createElement("p");
     summary.className = "chapter-summary";
     summary.textContent = chapter.summary;
-    fragment.appendChild(summary);
+    target.appendChild(summary);
   }
 
-  chapter.paragraphs.forEach((paragraph) => renderParagraph(fragment, paragraph));
-
-  return fragment;
-}
-
-function renderChapterContent(target, chapter, { includeSummary = false } = {}) {
-  if (!target || !chapter) return null;
-  target.innerHTML = "";
-  const fragment = createChapterFragment(chapter, { includeSummary });
-  target.appendChild(fragment);
-  return target;
+  chapter.paragraphs.forEach((paragraph) => renderParagraph(target, paragraph));
 }
 
 const MAX_CACHE_SIZE = 2;
@@ -86,6 +78,7 @@ export function createReaderView({ readerContainer, modalContainer, readerTracke
   }
 
   function takeCachedFragments(slug) {
+    if (!slug) return null;
     if (!fragmentCache.has(slug)) {
       return null;
     }
@@ -107,14 +100,24 @@ export function createReaderView({ readerContainer, modalContainer, readerTracke
       return false;
     }
     const fragments = {
-      readerFragment: readerContainer ? createChapterFragment(chapter, { includeSummary: false }) : null,
-      modalFragment: modalContainer ? createChapterFragment(chapter, { includeSummary: true }) : null
+      readerFragment: readerContainer ? buildFragment(chapter, { includeSummary: false }) : null,
+      modalFragment: modalContainer ? buildFragment(chapter, { includeSummary: true }) : null
     };
     if (!fragments.readerFragment && !fragments.modalFragment) {
       return false;
     }
     cacheFragments(chapter.slug, fragments);
     return true;
+  }
+
+  function buildFragment(chapter, options) {
+    const wrapper = document.createElement("div");
+    renderChapterContent(wrapper, chapter, options);
+    const fragment = document.createDocumentFragment();
+    while (wrapper.firstChild) {
+      fragment.appendChild(wrapper.firstChild);
+    }
+    return fragment;
   }
 
   function render(index) {
@@ -127,20 +130,22 @@ export function createReaderView({ readerContainer, modalContainer, readerTracke
 
     if (readerContainer) {
       readerContainer.innerHTML = "";
-      const fragment =
-        cached && cached.readerFragment
-          ? cached.readerFragment
-          : createChapterFragment(chapter, { includeSummary: false });
-      readerContainer.appendChild(fragment);
+      readerContainer.dataset.slug = chapter.slug;
+      if (cached && cached.readerFragment) {
+        readerContainer.appendChild(cached.readerFragment);
+      } else {
+        renderChapterContent(readerContainer, chapter, { includeSummary: false });
+      }
     }
 
     if (modalContainer) {
       modalContainer.innerHTML = "";
-      const fragment =
-        cached && cached.modalFragment
-          ? cached.modalFragment
-          : createChapterFragment(chapter, { includeSummary: true });
-      modalContainer.appendChild(fragment);
+      modalContainer.dataset.slug = chapter.slug;
+      if (cached && cached.modalFragment) {
+        modalContainer.appendChild(cached.modalFragment);
+      } else {
+        renderChapterContent(modalContainer, chapter, { includeSummary: true });
+      }
     }
 
     if (readerTracker && typeof readerTracker.onChapterRendered === "function") {

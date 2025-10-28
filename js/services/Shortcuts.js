@@ -52,6 +52,18 @@ export function initShortcuts(handlers = {}) {
       case "Escape":
         handled = invoke(handlers.onEscape, event);
         break;
+      case "/":
+      case "?":
+        handled = invoke(handlers.onSearchFocus, event);
+        break;
+      case "n":
+      case "N":
+        if (event.shiftKey) {
+          handled = invoke(handlers.onSearchPrev, event);
+        } else {
+          handled = invoke(handlers.onSearchNext, event);
+        }
+        break;
       default:
         break;
     }

@@ -3,6 +3,7 @@ import ChaptersRepo from "../services/ChaptersRepo.js";
 import ThemeService from "../services/ThemeService.js";
 import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
+import { createSearchController } from "../reader/SearchInChapter.js";
 import { createTocList } from "../reader/TocList.js";
 import { createReaderModal } from "../modal/ReaderModal.js";
 import { initShortcuts } from "../services/Shortcuts.js";
@@ -30,6 +31,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalProgressFill = modalProgressBar?.querySelector(".progress-fill");
   const modalContent = readerModalElement ? readerModalElement.querySelector(".modal-content") : null;
   const readingTimeDisplay = document.querySelector("[data-reading-time]");
+  const searchInput = document.getElementById("chap-search");
+  const searchPrevBtn = document.getElementById("chap-search-prev");
+  const searchNextBtn = document.getElementById("chap-search-next");
+  const searchClearBtn = document.getElementById("chap-search-clear");
+  const searchStatus = document.getElementById("chap-search-status");
+  const SEARCH_HIGHLIGHT_CAP = 200;
+  const SEARCH_DEBOUNCE_MS = 160;
 
   let currentChapterIndex = 0;
   let readerProgressTracker;
@@ -41,6 +49,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastRoute = null;
   let preparedNextSlug = null;
   let preparedPrevSlug = null;
+  let searchController = null;
+  let searchDebounce = null;
 
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
   if (initialQuerySlug) {
@@ -135,6 +145,26 @@ document.addEventListener("DOMContentLoaded", () => {
     onScrollUp: () => {
       scrollActiveContainer("up");
       return true;
+    },
+    onSearchFocus: () => {
+      if (!searchInput) return false;
+      searchInput.focus({ preventScroll: false });
+      searchInput.select();
+      return true;
+    },
+    onSearchNext: () => {
+      if (!searchController || !searchInput?.value.trim()) return false;
+      const state = searchController.getState();
+      if (!state.total) return false;
+      searchController.next();
+      return true;
+    },
+    onSearchPrev: () => {
+      if (!searchController || !searchInput?.value.trim()) return false;
+      const state = searchController.getState();
+      if (!state.total) return false;
+      searchController.prev();
+      return true;
     }
   });
 
@@ -196,6 +226,61 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   openReaderBtn?.addEventListener("click", () => readerModalController?.open());
+
+  if (searchInput && readerContent) {
+    searchController = createSearchController({
+      articleEl: readerContent,
+      maxHighlights: SEARCH_HIGHLIGHT_CAP
+    });
+
+    searchController.onStateChange(updateSearchStatus);
+    updateSearchStatus();
+
+    searchInput.addEventListener("input", (event) => {
+      const value = event.target.value.trim();
+      if (searchDebounce) {
+        clearTimeout(searchDebounce);
+      }
+      searchDebounce = window.setTimeout(() => {
+        searchDebounce = null;
+        searchController?.setQuery(value);
+      }, SEARCH_DEBOUNCE_MS);
+    });
+
+    searchPrevBtn?.addEventListener("click", () => {
+      if (!searchController) return;
+      const state = searchController.getState();
+      if (!state.total) return;
+      searchController.prev();
+    });
+
+    searchNextBtn?.addEventListener("click", () => {
+      if (!searchController) return;
+      const state = searchController.getState();
+      if (!state.total) return;
+      searchController.next();
+    });
+
+    searchClearBtn?.addEventListener("click", () => {
+      searchController?.clear();
+      searchInput.value = "";
+      updateSearchStatus();
+      searchInput.focus();
+    });
+
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        searchController?.clear();
+        searchInput.value = "";
+        updateSearchStatus();
+        searchInput.blur();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        searchController?.next();
+      }
+    });
+  }
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
@@ -308,6 +393,10 @@ document.addEventListener("DOMContentLoaded", () => {
     preparedNextSlug = null;
     preparedPrevSlug = null;
     prepareAdjacentChapters(safeIndex);
+    searchController?.onChapterChanged();
+    if (!searchInput || !searchInput.value.trim()) {
+      updateSearchStatus();
+    }
 
     if (updateHash) {
       linkToChapter(chapter.slug);
@@ -468,6 +557,26 @@ document.addEventListener("DOMContentLoaded", () => {
       window.requestIdleCallback(callback, { timeout: 120 });
     } else {
       window.setTimeout(callback, 0);
+    }
+  }
+
+  function updateSearchStatus(state) {
+    if (!searchStatus) return;
+    const info = state || (searchController ? searchController.getState() : null);
+    const queryActive = Boolean(searchInput?.value.trim());
+    if (!queryActive) {
+      searchStatus.textContent = "";
+      return;
+    }
+    if (!info || info.total === 0) {
+      searchStatus.textContent = "无结果";
+      return;
+    }
+    const capNote = info.capped ? `（已高亮前 ${info.highlighted} 处）` : "";
+    if (info.index >= 0) {
+      searchStatus.textContent = `第 ${info.index + 1} / ${info.total} 处${capNote}`;
+    } else {
+      searchStatus.textContent = `共 ${info.total} 处${capNote}`;
     }
   }
 });

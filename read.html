@@ -71,6 +71,16 @@
               <button class="pill" data-theme="dusk">暮色</button>
               <button class="pill" data-theme="night">星夜</button>
             </div>
+            <div class="toolbar-group reader-search">
+              <label class="visually-hidden" for="chap-search">搜索本章</label>
+              <input id="chap-search" type="search" placeholder="搜索本章…" autocomplete="off" spellcheck="false">
+              <div class="search-controls">
+                <button id="chap-search-prev" type="button" aria-label="上一个命中">‹</button>
+                <button id="chap-search-next" type="button" aria-label="下一个命中">›</button>
+                <button id="chap-search-clear" type="button" aria-label="清除搜索">×</button>
+              </div>
+              <span id="chap-search-status" role="status" aria-live="polite" aria-atomic="true"></span>
+            </div>
           </header>
           <div class="reader-content" data-theme="day"></div>
         </article>
