@@ -7,16 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>星海小说 | 沉浸式中文原创与阅读平台</title>
-  <script src="js/services/Stores.js"></script>
-  <script src="js/services/ThemeService.js"></script>
-  <script src="js/services/Shortcuts.js"></script>
-  <script src="js/services/ChaptersRepo.js"></script>
-  <script src="js/reader/ProgressTracker.js"></script>
-  <script src="js/reader/ReaderView.js"></script>
-  <script src="js/router.js"></script>
-  <script src="js/a11y/FocusTrap.js"></script>
-  <script src="js/modal/ReaderModal.js"></script>
-  <script src="js/reader/TocList.js"></script>
+  <link rel="modulepreload" href="./js/main.js">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -397,6 +388,6 @@
     灵感已捕捉，稍后可在“章节笔记”查看。
   </div>
 
-  <script src="app.js" defer></script>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>

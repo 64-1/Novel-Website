@@ -1,156 +1,145 @@
-(function (global) {
-  if (global.NovelReaderModal) {
-    return;
+import { createFocusTrap } from "../a11y/FocusTrap.js";
+
+function toArray(collection) {
+  if (!collection) return [];
+  return Array.isArray(collection) ? collection : Array.from(collection);
+}
+
+export function createReaderModal({
+  modalElement,
+  modalContent,
+  openButton,
+  closeElements,
+  progressTracker,
+  syncTheme,
+  onOpen,
+  onClose
+} = {}) {
+  if (!modalElement) {
+    throw new Error("ReaderModal.create requires a modalElement.");
   }
 
-  const FocusTrapFactory = global.NovelFocusTrap;
-
-  if (!FocusTrapFactory) {
-    throw new Error("NovelReaderModal requires NovelFocusTrap to be loaded first.");
+  if (modalContent && !modalContent.hasAttribute("tabindex")) {
+    modalContent.setAttribute("tabindex", "-1");
   }
 
-  function toArray(collection) {
-    if (!collection) return [];
-    return Array.isArray(collection) ? collection : Array.from(collection);
+  const closeTargets = toArray(closeElements);
+
+  const focusTrap = createFocusTrap({
+    container: modalContent || modalElement,
+    boundary: modalElement,
+    fallback: () => modalContent || modalElement
+  });
+  focusTrap.setFallback(() => modalContent || modalElement);
+
+  let lastFocusedElement = null;
+
+  function isOpen() {
+    return modalElement.classList.contains("active");
   }
 
-  function create({
-    modalElement,
-    modalContent,
-    openButton,
-    closeElements,
-    progressTracker,
-    syncTheme,
-    onOpen,
-    onClose
-  } = {}) {
-    if (!modalElement) {
-      throw new Error("ReaderModal.create requires a modalElement.");
+  function storeLastFocus() {
+    const active = document.activeElement;
+    lastFocusedElement = active instanceof HTMLElement ? active : null;
+  }
+
+  function restoreFocus() {
+    if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+      lastFocusedElement.focus({ preventScroll: true });
     }
+    lastFocusedElement = null;
+  }
 
-    if (modalContent && !modalContent.hasAttribute("tabindex")) {
-      modalContent.setAttribute("tabindex", "-1");
+  function applyOpenState() {
+    modalElement.classList.add("active");
+    modalElement.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+  }
+
+  function applyCloseState() {
+    modalElement.classList.remove("active");
+    modalElement.setAttribute("aria-hidden", "true");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open() {
+    if (isOpen()) {
+      return;
     }
-
-    const closeTargets = toArray(closeElements);
-
-    const focusTrap = FocusTrapFactory.create({
-      container: modalContent || modalElement,
-      boundary: modalElement,
-      fallback: () => modalContent || modalElement
-    });
-    focusTrap.setFallback(() => modalContent || modalElement);
-
-    let lastFocusedElement = null;
-
-    function isOpen() {
-      return modalElement.classList.contains("active");
+    storeLastFocus();
+    applyOpenState();
+    if (typeof syncTheme === "function") {
+      syncTheme();
     }
-
-    function storeLastFocus() {
-      const active = global.document.activeElement;
-      lastFocusedElement = active instanceof HTMLElement ? active : null;
+    if (progressTracker && typeof progressTracker.refresh === "function") {
+      progressTracker.refresh({ fromStorage: true });
     }
-
-    function restoreFocus() {
-      if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
-        lastFocusedElement.focus({ preventScroll: true });
-      }
-      lastFocusedElement = null;
-    }
-
-    function applyOpenState() {
-      modalElement.classList.add("active");
-      modalElement.setAttribute("aria-hidden", "false");
-      global.document.documentElement.style.overflow = "hidden";
-    }
-
-    function applyCloseState() {
-      modalElement.classList.remove("active");
-      modalElement.setAttribute("aria-hidden", "true");
-      global.document.documentElement.style.overflow = "";
-    }
-
-    function open() {
-      if (isOpen()) {
-        return;
-      }
-      storeLastFocus();
-      applyOpenState();
-      if (typeof syncTheme === "function") {
-        syncTheme();
-      }
-      if (progressTracker && typeof progressTracker.refresh === "function") {
-        progressTracker.refresh({ fromStorage: true });
-      }
-      focusTrap.activate();
-      focusTrap.refresh();
-      global.requestAnimationFrame(() => {
-        global.requestAnimationFrame(() => {
-          focusTrap.focusFirst({ fallback: modalContent || modalElement });
-        });
+    focusTrap.activate();
+    focusTrap.refresh();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        focusTrap.focusFirst({ fallback: modalContent || modalElement });
       });
-      if (typeof onOpen === "function") {
-        onOpen();
-      }
+    });
+    if (typeof onOpen === "function") {
+      onOpen();
     }
+  }
 
-    function close() {
-      if (!isOpen()) {
-        return;
-      }
-      applyCloseState();
-      focusTrap.deactivate();
-      restoreFocus();
-      if (typeof onClose === "function") {
-        onClose();
-      }
+  function close() {
+    if (!isOpen()) {
+      return;
     }
-
-    function handleRootClick(event) {
-      if (event.target === modalElement) {
-        close();
-      }
+    applyCloseState();
+    focusTrap.deactivate();
+    restoreFocus();
+    if (typeof onClose === "function") {
+      onClose();
     }
+  }
 
-    function handleOpenClick() {
-      open();
-    }
-
-    function handleCloseClick() {
+  function handleRootClick(event) {
+    if (event.target === modalElement) {
       close();
     }
+  }
 
-    function initEvents() {
-      modalElement.addEventListener("click", handleRootClick);
-      openButton?.addEventListener("click", handleOpenClick);
-      closeTargets.forEach((element) => {
-        element.addEventListener("click", handleCloseClick);
-      });
-    }
+  function handleOpenClick() {
+    open();
+  }
 
-    initEvents();
+  function handleCloseClick() {
+    close();
+  }
 
-    function refreshFocusTrap() {
-      focusTrap.refresh();
-    }
-
-    function setReturnFocus(element) {
-      lastFocusedElement = element instanceof HTMLElement ? element : null;
-    }
-
-    return Object.freeze({
-      open,
-      close,
-      isOpen,
-      refreshFocusTrap,
-      focusFirst: () => focusTrap.focusFirst({ fallback: modalContent || modalElement }),
-      setReturnFocus
+  function initEvents() {
+    modalElement.addEventListener("click", handleRootClick);
+    openButton?.addEventListener("click", handleOpenClick);
+    closeTargets.forEach((element) => {
+      element.addEventListener("click", handleCloseClick);
     });
   }
 
-  global.NovelReaderModal = Object.freeze({
-    create
-  });
-})(window);
+  initEvents();
 
+  function refreshFocusTrap() {
+    focusTrap.refresh();
+  }
+
+  function setReturnFocus(element) {
+    lastFocusedElement = element instanceof HTMLElement ? element : null;
+  }
+
+  return Object.freeze({
+    open,
+    close,
+    isOpen,
+    refreshFocusTrap,
+    focusFirst: () => focusTrap.focusFirst({ fallback: modalContent || modalElement }),
+    setReturnFocus
+  });
+}
+
+export default {
+  createReaderModal
+};

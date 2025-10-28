@@ -1,9 +1,21 @@
-const CACHE_NAME = "xinghai-static-v1";
+const CACHE_NAME = "xinghai-static-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./app.js",
+  "./js/main.js",
+  "./js/app/initApp.js",
+  "./js/services/Stores.js",
+  "./js/services/ChaptersRepo.js",
+  "./js/services/ThemeService.js",
+  "./js/services/Shortcuts.js",
+  "./js/reader/ProgressTracker.js",
+  "./js/reader/ReaderView.js",
+  "./js/reader/TocList.js",
+  "./js/modal/ReaderModal.js",
+  "./js/a11y/FocusTrap.js",
+  "./js/router.js",
+  "./js/strings.js",
   "./chapters.json",
   "./manifest.json",
   "./icons/icon-192.png",

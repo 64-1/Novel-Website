@@ -1,112 +1,101 @@
-(function (global) {
-  if (global.NovelRouter) {
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function parseHash(rawHash) {
+  if (!rawHash) return null;
+  const hash = rawHash.replace(/^#/, "");
+  if (!hash) return null;
+
+  if (hash === "reader") {
+    return { type: "reader" };
+  }
+  if (hash === "writer") {
+    return { type: "writer" };
+  }
+  if (hash.startsWith("novel/")) {
+    const slugPart = hash.slice("novel/".length);
+    if (!slugPart) {
+      return null;
+    }
+    const decoded = safeDecode(slugPart);
+    return {
+      type: "novel",
+      slug: decoded,
+      encodedSlug: slugPart
+    };
+  }
+  return null;
+}
+
+let onRouteCallback = null;
+let started = false;
+let suppressNextEvent = false;
+let boundHashChange = null;
+
+function notify(route, { initial = false } = {}) {
+  if (typeof onRouteCallback === "function") {
+    if (route) {
+      onRouteCallback({ ...route, initial });
+    } else {
+      onRouteCallback(null);
+    }
+  }
+}
+
+function handleHashChange() {
+  if (suppressNextEvent) {
+    suppressNextEvent = false;
     return;
   }
+  const route = parseHash(window.location.hash);
+  notify(route, { initial: false });
+}
 
-  function safeDecode(value) {
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
+export function startRouter({ onRoute } = {}) {
+  onRouteCallback = typeof onRoute === "function" ? onRoute : null;
+  if (started) {
+    console.warn("[Router] start called multiple times; ignoring subsequent call.");
+    notify(parseHash(window.location.hash), { initial: true });
+    return {
+      stop() {}
+    };
   }
 
-  function parseHash(rawHash) {
-    if (!rawHash) return null;
-    const hash = rawHash.replace(/^#/, "");
-    if (!hash) return null;
+  boundHashChange = handleHashChange;
+  window.addEventListener("hashchange", boundHashChange);
+  started = true;
 
-    if (hash === "reader") {
-      return { type: "reader" };
+  const initialRoute = parseHash(window.location.hash);
+  notify(initialRoute, { initial: true });
+
+  return {
+    stop() {
+      if (!started) return;
+      window.removeEventListener("hashchange", boundHashChange);
+      started = false;
+      onRouteCallback = null;
+      boundHashChange = null;
     }
-    if (hash === "writer") {
-      return { type: "writer" };
-    }
-    if (hash.startsWith("novel/")) {
-      const slugPart = hash.slice("novel/".length);
-      if (!slugPart) {
-        return null;
-      }
-      const decoded = safeDecode(slugPart);
-      return {
-        type: "novel",
-        slug: decoded,
-        encodedSlug: slugPart
-      };
-    }
-    return null;
+  };
+}
+
+export function linkToChapter(slug) {
+  if (!slug) return;
+  const encoded = encodeURIComponent(slug);
+  const desiredHash = `#novel/${encoded}`;
+  if (window.location.hash === desiredHash) {
+    return;
   }
+  suppressNextEvent = true;
+  window.location.hash = desiredHash;
+}
 
-  const Router = (() => {
-    let onRouteCallback = null;
-    let started = false;
-    let suppressNextEvent = false;
-    let boundHashChange = null;
-
-    function notify(route, { initial = false } = {}) {
-      if (typeof onRouteCallback === "function") {
-        if (route) {
-          onRouteCallback({ ...route, initial });
-        } else {
-          onRouteCallback(null);
-        }
-      }
-    }
-
-    function handleHashChange() {
-      if (suppressNextEvent) {
-        suppressNextEvent = false;
-        return;
-      }
-      const route = parseHash(global.location.hash);
-      notify(route, { initial: false });
-    }
-
-    function start({ onRoute } = {}) {
-      onRouteCallback = typeof onRoute === "function" ? onRoute : null;
-      if (started) {
-        console.warn("[Router] start called multiple times; ignoring subsequent call.");
-        notify(parseHash(global.location.hash), { initial: true });
-        return {
-          stop() {}
-        };
-      }
-
-      boundHashChange = handleHashChange;
-      global.addEventListener("hashchange", boundHashChange);
-      started = true;
-
-      const initialRoute = parseHash(global.location.hash);
-      notify(initialRoute, { initial: true });
-
-      return {
-        stop() {
-          if (!started) return;
-          global.removeEventListener("hashchange", boundHashChange);
-          started = false;
-          onRouteCallback = null;
-          boundHashChange = null;
-        }
-      };
-    }
-
-    function linkToChapter(slug) {
-      if (!slug) return;
-      const encoded = encodeURIComponent(slug);
-      const desiredHash = `#novel/${encoded}`;
-      if (global.location.hash === desiredHash) {
-        return;
-      }
-      suppressNextEvent = true;
-      global.location.hash = desiredHash;
-    }
-
-    return Object.freeze({
-      start,
-      linkToChapter
-    });
-  })();
-
-  global.NovelRouter = Router;
-})(window);
-
+export default {
+  startRouter,
+  linkToChapter
+};
