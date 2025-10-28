@@ -13,7 +13,7 @@ export function initApp({
   if (!stores) {
     throw new Error("initApp requires stores dependency");
   }
-  const { ReaderSettingsStore, DraftStore } = stores;
+  const { ReaderSettingsStore, DraftStore, LastReadStore } = stores;
   if (!ReaderSettingsStore || !DraftStore) {
     throw new Error("stores missing ReaderSettingsStore or DraftStore");
   }
@@ -97,6 +97,8 @@ export function initApp({
     let lastRoute = null;
     let readerModalController = null;
     let chapters = [];
+    let preparedNextSlug = null;
+    let preparedPrevSlug = null;
 
     const readerSettings = loadReaderSettings();
     applyReaderSettings();
@@ -115,7 +117,8 @@ export function initApp({
       container: readerContent,
       progressBar: readerProgressBar,
       progressFill: readerProgressFill,
-      context: "reader"
+      context: "reader",
+      onProgress: handleReaderProgress
     });
 
     modalProgressTracker = createProgressTracker({
@@ -215,6 +218,14 @@ export function initApp({
         persistReaderSettings,
         syncModalTheme
       });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        readerView.clearCache?.();
+        preparedNextSlug = null;
+        preparedPrevSlug = null;
+      }
     });
 
     scrollButtons.forEach((button) => {
@@ -409,6 +420,12 @@ export function initApp({
       tocListController.setActive(safeIndex);
       readerModalController?.refreshFocusTrap();
       syncModalTheme();
+      if (LastReadStore && typeof LastReadStore.set === "function") {
+        LastReadStore.set({ slug: chapter.slug });
+      }
+      preparedNextSlug = null;
+      preparedPrevSlug = null;
+      prepareAdjacentChapters(safeIndex);
       if (updateHash) {
         router.linkToChapter(chapter.slug);
         lastRoute = {
@@ -467,6 +484,69 @@ export function initApp({
         }
         default:
           return false;
+      }
+    }
+
+    function handleReaderProgress(progress, detail) {
+      if (!detail || detail.context !== "reader" || typeof progress !== "number") {
+        return;
+      }
+      const currentChapter = chapters[currentChapterIndex];
+      if (!currentChapter || detail.slug !== currentChapter.slug) {
+        return;
+      }
+      if (progress >= 0.7) {
+        prepareChapter(currentChapterIndex + 1, "next");
+      } else if (progress <= 0.3) {
+        prepareChapter(currentChapterIndex - 1, "prev");
+      }
+    }
+
+    function prepareAdjacentChapters(index) {
+      prepareChapter(index + 1, "next");
+      prepareChapter(index - 1, "prev");
+    }
+
+    function prepareChapter(index, direction) {
+      if (!Number.isFinite(index) || index < 0 || index >= chapters.length) {
+        return;
+      }
+      const chapter = chapters[index] || chaptersRepo.getByIndex(index);
+      if (!chapter || !chapter.slug) {
+        return;
+      }
+      const slug = chapter.slug;
+      if (direction === "next" && slug === preparedNextSlug) {
+        return;
+      }
+      if (direction === "prev" && slug === preparedPrevSlug) {
+        return;
+      }
+
+      if (direction === "next") {
+        preparedNextSlug = slug;
+      } else {
+        preparedPrevSlug = slug;
+      }
+
+      runWhenIdle(() => {
+        const prepared = readerView.prepare(index);
+        if (!prepared) {
+          if (direction === "next" && preparedNextSlug === slug) {
+            preparedNextSlug = null;
+          }
+          if (direction === "prev" && preparedPrevSlug === slug) {
+            preparedPrevSlug = null;
+          }
+        }
+      });
+    }
+
+    function runWhenIdle(callback) {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(callback, { timeout: 120 });
+      } else {
+        window.setTimeout(callback, 0);
       }
     }
 

@@ -263,6 +263,27 @@ a {
   gap: 14px;
 }
 
+#continue-reading-slot {
+  margin-top: 24px;
+  max-width: 360px;
+}
+
+.continue-reading-card {
+  display: grid;
+  gap: 12px;
+}
+
+.continue-reading-title {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.continue-reading-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .hero-visual {
   position: relative;
 }

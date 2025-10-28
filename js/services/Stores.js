@@ -112,11 +112,46 @@ export const ProgressStore = {
   }
 };
 
+export const LastReadStore = {
+  KEY: "novel:lastread:v1",
+  get() {
+    const data = safeParse(storage.getItem(this.KEY));
+    if (!data || typeof data.slug !== "string" || !data.slug.trim()) {
+      this.clear();
+      return null;
+    }
+    return {
+      slug: data.slug.trim(),
+      updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0
+    };
+  },
+  set(record) {
+    if (!record || typeof record.slug !== "string" || !record.slug.trim()) {
+      return false;
+    }
+    const payload = {
+      slug: record.slug.trim(),
+      updatedAt: Date.now()
+    };
+    try {
+      storage.setItem(this.KEY, JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      console.warn("[Stores] Failed to persist last-read chapter.", error);
+      return false;
+    }
+  },
+  clear() {
+    storage.removeItem(this.KEY);
+  }
+};
+
 const Stores = Object.freeze({
   ReaderSettingsStore,
   DraftStore,
   ShellThemeStore,
-  ProgressStore
+  ProgressStore,
+  LastReadStore
 });
 
 export default Stores;

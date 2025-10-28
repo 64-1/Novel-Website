@@ -1,4 +1,4 @@
-import { ReaderSettingsStore } from "../services/Stores.js";
+import { ReaderSettingsStore, LastReadStore } from "../services/Stores.js";
 import ChaptersRepo from "../services/ChaptersRepo.js";
 import ThemeService from "../services/ThemeService.js";
 import { createTracker } from "../reader/ProgressTracker.js";
@@ -35,11 +35,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let readerProgressTracker;
   let modalProgressTracker;
   let readerModalController = null;
-  let shortcutsController = null;
   let chapters = [];
   let chaptersReady = false;
   let pendingRoute = null;
   let lastRoute = null;
+  let preparedNextSlug = null;
+  let preparedPrevSlug = null;
 
   const initialQuerySlug = getChapterSlugFromQuery(window.location.search);
   if (initialQuerySlug) {
@@ -64,7 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
     container: readerContent,
     progressBar: readerProgressBar,
     progressFill: readerProgressFill,
-    context: "reader"
+    context: "reader",
+    onProgress: handleReaderProgress
   });
 
   modalProgressTracker = createTracker({
@@ -98,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     onChapterSelect: (index) => selectChapter(index)
   });
 
-  shortcutsController = initShortcuts({
+  initShortcuts({
     onEscape: () => {
       if (readerModalController?.isOpen()) {
         readerModalController.close();
@@ -195,6 +197,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   openReaderBtn?.addEventListener("click", () => readerModalController?.open());
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      readerView.clearCache?.();
+      preparedNextSlug = null;
+      preparedPrevSlug = null;
+    }
+  });
+
   loadChapters();
 
   function loadReaderSettings() {
@@ -257,8 +267,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     chaptersReady = true;
-    const initialHandled = pendingRoute ? applyRoute(pendingRoute) : applyRoute(lastRoute);
+    let initialHandled = false;
+    if (pendingRoute) {
+      initialHandled = applyRoute(pendingRoute);
+    } else if (lastRoute) {
+      initialHandled = applyRoute(lastRoute);
+    }
     pendingRoute = null;
+
+    if (!initialHandled) {
+      const lastRead = resolveLastRead();
+      if (lastRead) {
+        currentChapterIndex = lastRead.index;
+        selectChapter(currentChapterIndex, { updateHash: true });
+        initialHandled = true;
+      }
+    }
 
     if (!initialHandled) {
       selectChapter(currentChapterIndex, { updateHash: true });
@@ -280,6 +304,10 @@ document.addEventListener("DOMContentLoaded", () => {
     tocListController.setActive(safeIndex);
     readerModalController?.refreshFocusTrap();
     updateReadingTime(chapter);
+    LastReadStore.set({ slug: chapter.slug });
+    preparedNextSlug = null;
+    preparedPrevSlug = null;
+    prepareAdjacentChapters(safeIndex);
 
     if (updateHash) {
       linkToChapter(chapter.slug);
@@ -365,5 +393,81 @@ document.addEventListener("DOMContentLoaded", () => {
     url.searchParams.delete("chapter");
     url.hash = `#novel/${encodeURIComponent(slug)}`;
     history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function resolveLastRead() {
+    const record = LastReadStore.get();
+    if (!record || !record.slug) {
+      return null;
+    }
+    const index = ChaptersRepo.getIndexBySlug(record.slug);
+    if (typeof index !== "number" || index < 0) {
+      LastReadStore.clear();
+      return null;
+    }
+    return { slug: record.slug, index };
+  }
+
+  function handleReaderProgress(progress, detail) {
+    if (!detail || detail.context !== "reader" || typeof progress !== "number") {
+      return;
+    }
+    const currentChapter = chapters[currentChapterIndex];
+    if (!currentChapter || detail.slug !== currentChapter.slug) {
+      return;
+    }
+    if (progress >= 0.7) {
+      prepareChapter(currentChapterIndex + 1, "next");
+    } else if (progress <= 0.3) {
+      prepareChapter(currentChapterIndex - 1, "prev");
+    }
+  }
+
+  function prepareAdjacentChapters(index) {
+    prepareChapter(index + 1, "next");
+    prepareChapter(index - 1, "prev");
+  }
+
+  function prepareChapter(index, direction) {
+    if (!Number.isFinite(index) || index < 0 || index >= chapters.length) {
+      return;
+    }
+    const chapter = ChaptersRepo.getByIndex(index);
+    if (!chapter) {
+      return;
+    }
+    const slug = chapter.slug;
+    if (direction === "next" && slug === preparedNextSlug) {
+      return;
+    }
+    if (direction === "prev" && slug === preparedPrevSlug) {
+      return;
+    }
+
+    if (direction === "next") {
+      preparedNextSlug = slug;
+    } else {
+      preparedPrevSlug = slug;
+    }
+
+    runWhenIdle(() => {
+      const prepared = readerView.prepare(index);
+      if (!prepared) {
+        if (direction === "next" && preparedNextSlug === slug) {
+          preparedNextSlug = null;
+        }
+        if (direction === "prev" && preparedPrevSlug === slug) {
+          preparedPrevSlug = null;
+        }
+      }
+    });
+  }
+
+  function runWhenIdle(callback) {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(callback, { timeout: 120 });
+    } else {
+      window.setTimeout(callback, 0);
+    }
   }
 });

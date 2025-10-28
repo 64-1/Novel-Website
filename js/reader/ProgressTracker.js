@@ -5,7 +5,13 @@ function clampProgress(value) {
   return Math.min(Math.max(Number(value) || 0, 0), 1);
 }
 
-export function createTracker({ container, progressBar, progressFill, context = "reader" } = {}) {
+export function createTracker({
+  container,
+  progressBar,
+  progressFill,
+  context = "reader",
+  onProgress
+} = {}) {
   if (!container || !progressBar || !progressFill) {
     return null;
   }
@@ -54,6 +60,7 @@ export function createTracker({ container, progressBar, progressFill, context = 
     const progress = getProgressFromScroll();
     renderProgress(progress);
     persistProgress(progress);
+    notifyProgress(progress);
   }
 
   function getProgressFromScroll() {
@@ -100,6 +107,7 @@ export function createTracker({ container, progressBar, progressFill, context = 
       const targetScroll = canScroll ? targetProgress * maxScroll : 0;
       container.scrollTop = targetScroll;
       renderProgress(targetProgress);
+      notifyProgress(targetProgress);
       requestAnimationFrame(() => scheduleUpdate(true));
     });
   }
@@ -121,6 +129,12 @@ export function createTracker({ container, progressBar, progressFill, context = 
       applyStoredScroll();
     } else {
       scheduleUpdate(true);
+    }
+  }
+
+  function notifyProgress(progress) {
+    if (typeof onProgress === "function" && chapterSlug) {
+      onProgress(clampProgress(progress), { slug: chapterSlug, context });
     }
   }
 
