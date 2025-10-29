@@ -181,15 +181,32 @@
               <span class="filled"></span><span class="filled"></span><span></span><span class="filled"></span><span></span><span></span><span class="filled"></span>
             </div>
           </div>
-          <div class="sidebar-card">
+          <div class="sidebar-card music-card">
             <h4>写作音乐频道</h4>
             <p>选择氛围配乐，与文本情绪同步。</p>
-            <select id="music-mood">
-              <option value="ambient">环绕 · 深夜漂流</option>
-              <option value="lofi">Lo-Fi · 城市光影</option>
-              <option value="piano">钢琴 · 温柔晨光</option>
-            </select>
-            <button class="btn secondary" data-action="play-music">播放预设</button>
+            <div class="music-select" data-music-select>
+              <button
+                type="button"
+                class="music-select__trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="musicSelectMenu"
+                id="musicSelectTrigger"
+              >
+                <span class="music-select__value">环绕 · 深夜漂流</span>
+                <span class="music-select__icon" aria-hidden="true"></span>
+              </button>
+              <ul class="music-select__menu" role="listbox" aria-labelledby="musicSelectTrigger" id="musicSelectMenu" hidden></ul>
+              <select id="music-mood" class="music-select__native">
+                <option value="ambient" selected>环绕 · 深夜漂流</option>
+                <option value="lofi">Lo-Fi · 城市光影</option>
+                <option value="piano">钢琴 · 温柔晨光</option>
+              </select>
+            </div>
+            <button class="btn secondary" data-action="play-music">
+              <span class="btn-icon"></span>
+              <span class="btn-label">播放预设</span>
+            </button>
           </div>
         </aside>
       </div>

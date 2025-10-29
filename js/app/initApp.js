@@ -84,6 +84,11 @@ export function initApp({
     const previewTags = document.getElementById("preview-tags");
     const musicSelect = document.getElementById("music-mood");
     const playMusicButton = document.querySelector('[data-action="play-music"]');
+    const playMusicButtonLabel = playMusicButton?.querySelector(".btn-label");
+
+    if (musicSelect) {
+      enhanceMusicSelect(musicSelect);
+    }
 
     let toastTimeout;
     let currentChapterIndex = 0;
@@ -313,13 +318,273 @@ export function initApp({
         (Strings?.toasts?.musicLoading && Strings.toasts.musicLoading(mood)) ||
         `已为你准备「${mood}」氛围音轨，正式版即将上线。`;
       showToast(musicMessage);
-      playMusicButton.textContent = "播放中...";
+      if (playMusicButtonLabel) {
+        playMusicButtonLabel.textContent = "播放中...";
+      }
       playMusicButton.disabled = true;
       setTimeout(() => {
-        playMusicButton.textContent = "播放预设";
+        if (playMusicButtonLabel) {
+          playMusicButtonLabel.textContent = "播放预设";
+        }
         playMusicButton.disabled = false;
       }, 2200);
     });
+
+    function enhanceMusicSelect(nativeSelect) {
+      const container = nativeSelect.closest("[data-music-select]");
+      if (!container) {
+        return null;
+      }
+
+      const trigger = container.querySelector(".music-select__trigger");
+      const valueNode = container.querySelector(".music-select__value");
+      const menu = container.querySelector(".music-select__menu");
+      if (!trigger || !valueNode || !menu) {
+        return null;
+      }
+
+      nativeSelect.setAttribute("aria-hidden", "true");
+      nativeSelect.tabIndex = -1;
+      menu.tabIndex = -1;
+
+      let optionNodes = [];
+      let isOpen = false;
+      let activeIndex = Math.max(nativeSelect.selectedIndex, 0);
+      const idPrefix = `music-option-${Math.random().toString(36).slice(2, 8)}-`;
+
+      renderOptions();
+
+      trigger.addEventListener("click", () => {
+        if (isOpen) {
+          closeMenu();
+        } else {
+          openMenu();
+        }
+      });
+
+      trigger.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowDown":
+          case "Down":
+            event.preventDefault();
+            if (!isOpen) {
+              openMenu();
+            }
+            setActive(Math.min(activeIndex + 1, optionNodes.length - 1));
+            break;
+          case "ArrowUp":
+          case "Up":
+            event.preventDefault();
+            if (!isOpen) {
+              openMenu();
+            }
+            setActive(Math.max(activeIndex - 1, 0));
+            break;
+          case "Enter":
+          case " ":
+            event.preventDefault();
+            if (isOpen) {
+              commitSelection(activeIndex);
+            } else {
+              openMenu();
+            }
+            break;
+          case "Escape":
+            if (isOpen) {
+              event.preventDefault();
+              closeMenu();
+            }
+            break;
+          default:
+            break;
+        }
+      });
+
+      menu.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowDown":
+          case "Down":
+            event.preventDefault();
+            setActive(Math.min(activeIndex + 1, optionNodes.length - 1));
+            break;
+          case "ArrowUp":
+          case "Up":
+            event.preventDefault();
+            setActive(Math.max(activeIndex - 1, 0));
+            break;
+          case "Home":
+            event.preventDefault();
+            setActive(0);
+            break;
+          case "End":
+            event.preventDefault();
+            setActive(optionNodes.length - 1);
+            break;
+          case "Enter":
+          case " ":
+            event.preventDefault();
+            commitSelection(activeIndex);
+            break;
+          case "Escape":
+            event.preventDefault();
+            closeMenu({ focusTrigger: true });
+            break;
+          default:
+            break;
+        }
+      });
+
+      nativeSelect.addEventListener("change", () => {
+        const selectedIdx = nativeSelect.selectedIndex;
+        updateSelectedState(selectedIdx);
+        setActive(selectedIdx, { scroll: false });
+        valueNode.textContent = nativeSelect.options[selectedIdx]?.text || "";
+      });
+
+      function renderOptions() {
+        menu.innerHTML = "";
+        optionNodes = [];
+        const selectOptions = Array.from(nativeSelect.options || []);
+        if (!selectOptions.length) {
+          valueNode.textContent = "";
+          return;
+        }
+        selectOptions.forEach((option, index) => {
+          const item = document.createElement("li");
+          item.className = "music-select__option";
+          item.id = `${idPrefix}${index}`;
+          item.setAttribute("role", "option");
+          item.tabIndex = -1;
+          item.dataset.value = option.value;
+          item.textContent = option.textContent;
+          item.setAttribute("aria-selected", option.selected ? "true" : "false");
+          if (option.selected) {
+            activeIndex = index;
+            item.classList.add("is-selected", "is-active");
+            menu.setAttribute("aria-activedescendant", item.id);
+            valueNode.textContent = option.textContent;
+          }
+          item.addEventListener("click", () => commitSelection(index));
+          item.addEventListener("mouseenter", () => setActive(index, { scroll: false }));
+          menu.appendChild(item);
+          optionNodes.push(item);
+        });
+
+        if (activeIndex < 0 && optionNodes.length) {
+          activeIndex = 0;
+          optionNodes[0].classList.add("is-active");
+          valueNode.textContent = selectOptions[0].textContent;
+        }
+        updateSelectedState(nativeSelect.selectedIndex);
+      }
+
+      function openMenu() {
+        if (isOpen || !optionNodes.length) {
+          return;
+        }
+        isOpen = true;
+        container.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+        menu.hidden = false;
+        setActive(nativeSelect.selectedIndex >= 0 ? nativeSelect.selectedIndex : 0);
+        document.addEventListener("pointerdown", handleDocumentPointer, true);
+        document.addEventListener("focusin", handleFocusIn, true);
+        document.addEventListener("keydown", handleGlobalKeydown, true);
+        requestAnimationFrame(() => {
+          menu.focus({ preventScroll: true });
+        });
+      }
+
+      function closeMenu({ focusTrigger = false } = {}) {
+        if (!isOpen) {
+          return;
+        }
+        isOpen = false;
+        container.classList.remove("is-open");
+        trigger.setAttribute("aria-expanded", "false");
+        menu.hidden = true;
+        document.removeEventListener("pointerdown", handleDocumentPointer, true);
+        document.removeEventListener("focusin", handleFocusIn, true);
+        document.removeEventListener("keydown", handleGlobalKeydown, true);
+        if (focusTrigger) {
+          trigger.focus({ preventScroll: true });
+        }
+      }
+
+      function setActive(index, { scroll = true } = {}) {
+        if (!optionNodes.length) {
+          return;
+        }
+        const safeIndex = Math.max(0, Math.min(index, optionNodes.length - 1));
+        optionNodes.forEach((node, nodeIndex) => {
+          node.classList.toggle("is-active", nodeIndex === safeIndex);
+        });
+        activeIndex = safeIndex;
+        const activeNode = optionNodes[safeIndex];
+        if (activeNode) {
+          menu.setAttribute("aria-activedescendant", activeNode.id);
+          if (scroll) {
+            activeNode.scrollIntoView({ block: "nearest" });
+          }
+        }
+      }
+
+      function commitSelection(index) {
+        if (!optionNodes.length) {
+          return;
+        }
+        const safeIndex = Math.max(0, Math.min(index, optionNodes.length - 1));
+        if (nativeSelect.selectedIndex !== safeIndex) {
+          nativeSelect.selectedIndex = safeIndex;
+          nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        } else {
+          updateSelectedState(safeIndex);
+        }
+        activeIndex = safeIndex;
+        valueNode.textContent = nativeSelect.options[safeIndex]?.text || "";
+        closeMenu({ focusTrigger: true });
+      }
+
+      function updateSelectedState(selectedIndex) {
+        if (!optionNodes.length) {
+          activeIndex = -1;
+          return;
+        }
+        optionNodes.forEach((node, nodeIndex) => {
+          const isSelected = nodeIndex === selectedIndex;
+          node.classList.toggle("is-selected", isSelected);
+          node.setAttribute("aria-selected", isSelected ? "true" : "false");
+        });
+        activeIndex = Math.max(0, Math.min(selectedIndex, optionNodes.length - 1));
+      }
+
+      function handleDocumentPointer(event) {
+        if (!container.contains(event.target)) {
+          closeMenu();
+        }
+      }
+
+      function handleFocusIn(event) {
+        if (!container.contains(event.target)) {
+          closeMenu();
+        }
+      }
+
+      function handleGlobalKeydown(event) {
+        if (event.key === "Escape" && isOpen) {
+          event.preventDefault();
+          closeMenu({ focusTrigger: true });
+        }
+      }
+
+      return {
+        close: closeMenu,
+        refresh: () => {
+          renderOptions();
+          updateSelectedState(nativeSelect.selectedIndex);
+        }
+      };
+    }
 
     [draftTitle, draftTags, draftBody].forEach((input) => {
       input?.addEventListener("input", () => {
