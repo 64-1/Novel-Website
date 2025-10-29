@@ -493,14 +493,18 @@ async function initTrendingSection() {
 
     container.innerHTML = ranked
       .map((item) => {
-        const cover = item.cover || "/icons/icon-192.png";
         const title = item.title || item.title_zh || item.title_en || item.slug;
         const slug = encodeURIComponent(item.slug);
         const meta = formatRelativeUpdate(item.updated_at);
+        const hasCover = Boolean(item.cover);
+        const coverClass = hasCover ? "trending-cover" : "trending-cover trending-cover--placeholder";
+        const coverImage = hasCover ? `<img src="${item.cover}" alt="${title} 封面">` : "";
+        const coverTitle = hasCover ? "" : `<span class="cover-title">${title}</span>`;
         return `
           <a class="trending-card" role="listitem" href="/novel/${slug}">
-            <div class="trending-cover">
-              <img src="${cover}" alt="">
+            <div class="${coverClass}">
+              ${coverImage}
+              ${coverTitle}
             </div>
             <div class="trending-meta">
               <span class="trending-title">${title}</span>
