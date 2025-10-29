@@ -1,5 +1,5 @@
-const CACHE_VERSION = "xinghai-static-v6";
-const CACHE_NAME = `xinghai-static-${CACHE_VERSION}`;
+const SW_VERSION = "v7";
+const CACHE_NAME = `xinghai-static-${SW_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
@@ -26,12 +26,40 @@ const ASSETS = [
   "./icons/icon-512.png"
 ];
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+function broadcastWaiting() {
+  if (!self.registration?.waiting) {
+    return;
+  }
+  self.clients
+    .matchAll({ includeUncontrolled: true, type: "window" })
+    .then((clients) => {
+      if (!clients || clients.length === 0) {
+        return;
+      }
+      clients.forEach((client) => {
+        client.postMessage({
+          type: "SW_WAITING",
+          version: SW_VERSION
+        });
+      });
+    })
+    .catch(() => {});
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then(() => {
+        setTimeout(broadcastWaiting, 120);
+      })
   );
 });
 
@@ -52,7 +80,7 @@ self.addEventListener("activate", (event) => {
         clients.forEach((client) => {
           client.postMessage({
             type: "SW_ACTIVATED",
-            version: CACHE_VERSION
+            version: SW_VERSION
           });
         });
       })
