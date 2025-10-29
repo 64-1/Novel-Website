@@ -28,7 +28,9 @@ const router = {
   linkToChapter
 };
 
-const shouldInitLandingApp = Boolean(document.getElementById("continue-reading-slot"));
+const shouldInitLandingApp = Boolean(
+  document.getElementById("continue-reading-slot") || document.querySelector(".writer-studio")
+);
 
 if (shouldInitLandingApp) {
   initApp({

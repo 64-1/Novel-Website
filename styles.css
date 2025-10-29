@@ -2747,7 +2747,7 @@ body.dark-shell .bookmark-toast {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition), opacity var(--transition));
+  transition: background var(--transition), color var(--transition), opacity var(--transition);
 }
 
 .update-toast__action--primary {

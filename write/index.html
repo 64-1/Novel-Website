@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <title>星海小说 · 创作者工作室</title>
+  <meta name="description" content="创作者工作室提供模块化章节管理、灵感快照与沉浸式预览，帮助你轻松完成中文原创创作。">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="星海小说">
+  <meta property="og:title" content="星海小说 · 创作者工作室">
+  <meta property="og:description" content="创作者工作室提供模块化章节管理、灵感快照与沉浸式预览，帮助你轻松完成中文原创创作。">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="/icons/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="星海小说 · 创作者工作室">
+  <meta name="twitter:description" content="创作者工作室提供模块化章节管理、灵感快照与沉浸式预览，帮助你轻松完成中文原创创作。">
+  <meta name="twitter:image" content="/icons/icon-512.png">
+  <link rel="canonical" href="/write/">
+  <link rel="modulepreload" href="/js/main.js">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/index.html">
+        <span class="brand-logo">星</span>
+        星海小说
+      </a>
+      <nav class="primary-nav">
+        <a href="/index.html#trending">趋势榜</a>
+        <a href="/index.html#discover">发现</a>
+        <a href="/read.html">阅读空间</a>
+        <a class="active" href="/write/">创作者工作室</a>
+      </nav>
+      <div class="search-wrap header-search" role="search">
+        <input
+          id="siteSearch"
+          placeholder="搜索书名 / 作者 / 标签…"
+          aria-label="搜索书籍"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          aria-controls="searchResults"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+      </div>
+      <div class="header-actions">
+        <a class="btn ghost" href="/index.html#community">社区活动</a>
+        <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero writer-hero" id="studio-lede">
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <p class="highlight">写作与灵感的同步控制台</p>
+          <h1>创作者工作室：让灵感、结构与排版同频</h1>
+          <p class="subhead">
+            以章节为单位的灵感管理、沉浸式排版预览与智能字数追踪，助力中文原创作者持续完成作品。
+          </p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#writer">进入创作面板</a>
+            <a class="btn secondary" href="/read.html">前往阅读空间</a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-card">
+            <h3>创作日历</h3>
+            <p>连续创作 12 天 · 灵感快照 4 条 · 正式发布 2 篇</p>
+            <div class="标签">
+              <span>连载</span><span>专注</span><span>沉浸</span>
+            </div>
+            <div class="progress">
+              <span>本周目标进度</span>
+              <div class="progress-bar"><span style="width: 76%"></span></div>
+            </div>
+          </div>
+          <div class="hero-floating">
+            <div class="floating-card">
+              <p class="meta">今日灵感捕捉</p>
+              <strong>6 条</strong>
+              <p class="meta">自动同步到章节笔记</p>
+            </div>
+            <div class="floating-card">
+              <p class="meta">草稿字数</p>
+              <strong>18,420 字</strong>
+              <p class="meta">已推进至第三幕</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="writer-studio" id="writer">
+      <div class="container section-header">
+        <div>
+          <p class="eyebrow">创作者工作室</p>
+          <h2>把灵感与结构一起写进作品</h2>
+          <p class="section-subtitle">
+            模块化章节管理、情绪配乐、自动章节排版与字数统计，帮你保持灵感流动。
+          </p>
+        </div>
+        <button class="btn secondary" data-action="open-writer">打开创作面板</button>
+      </div>
+      <div class="container writer-grid">
+        <div class="writer-panel">
+          <div class="writer-tabs">
+            <button class="tab active" data-panel="outline">章节笔记</button>
+            <button class="tab" data-panel="draft">草稿</button>
+            <button class="tab" data-panel="preview">排版预览</button>
+          </div>
+          <div class="writer-panels">
+            <div class="panel active" id="panel-outline">
+              <h3>《晨光谱系》 · 章节笔记</h3>
+              <ul class="note-list">
+                <li>
+                  <strong>人物动机</strong>
+                  <p>黎川对“真实”的执念与夏茗对“记忆”的恐惧形成对照。</p>
+                </li>
+                <li>
+                  <strong>情节节奏</strong>
+                  <p>第一幕静态观景，第二幕信息冲击，第三幕情感决断。</p>
+                </li>
+                <li>
+                  <strong>视觉意象</strong>
+                  <p>晨光、金色雾气、漂浮群岛与透明观星台形成反复出现的意象。</p>
+                </li>
+              </ul>
+            </div>
+            <div class="panel" id="panel-draft">
+              <h3>写作空间</h3>
+              <label class="input-label" for="draft-title">章节标题</label>
+              <input id="draft-title" type="text" placeholder="例如：第十三章 · 海浪回音" maxlength="40">
+              <label class="input-label" for="draft-tags">标签</label>
+              <input id="draft-tags" type="text" placeholder="软科幻, 群像, 治愈">
+              <label class="input-label" for="draft-body">正文</label>
+              <textarea id="draft-body" rows="14" placeholder="在这里开始书写你的灵感……"></textarea>
+              <div class="writer-meta">
+                <p>实时字数：<span id="word-count">0</span> 字</p>
+                <span class="autosave-status" id="autosave-status" aria-live="polite"></span>
+              </div>
+              <div class="writer-actions">
+                <button class="btn ghost" data-action="export-markdown">导出 Markdown</button>
+                <button class="btn ghost" data-action="import-markdown">导入 Markdown</button>
+                <input id="import-file" type="file" accept=".md,text/markdown" hidden>
+              </div>
+            </div>
+            <div class="panel" id="panel-preview">
+              <h3>排版预览</h3>
+              <article class="preview-article">
+                <h4 id="preview-title">第十三章 · 标题预览</h4>
+                <p id="preview-body">你在写作空间中输入的内容会即时排版呈现，方便你检查节奏与段落流动。</p>
+                <div class="preview-tags" id="preview-tags">
+                  <span>软科幻</span><span>群像</span><span>治愈</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+        <aside class="writer-sidebar">
+          <div class="sidebar-card">
+            <h4>灵感瞬间</h4>
+            <p>用“灵感快照”捕捉零碎念头，稍后再整合进章节。</p>
+            <button class="btn ghost" data-action="capture-idea">记录灵感</button>
+          </div>
+          <div class="sidebar-card">
+            <h4>进度日历</h4>
+            <p>可视化写作习惯，连续创作天数一目了然。</p>
+            <div class="calendar">
+              <span class="filled"></span><span class="filled"></span><span></span><span class="filled"></span><span></span><span></span><span class="filled"></span>
+            </div>
+          </div>
+          <div class="sidebar-card">
+            <h4>写作音乐频道</h4>
+            <p>选择氛围配乐，与文本情绪同步。</p>
+            <select id="music-mood">
+              <option value="ambient">环绕 · 深夜漂流</option>
+              <option value="lofi">Lo-Fi · 城市光影</option>
+              <option value="piano">钢琴 · 温柔晨光</option>
+            </select>
+            <button class="btn secondary" data-action="play-music">播放预设</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-logo">星</span>
+        <div>
+          <strong>星海小说</strong>
+          <p>让中文原创在温柔的光里闪耀。</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="/index.html#discover">关于我们</a>
+        <a href="/write/">创作者中心</a>
+        <a href="/index.html#community">读者小组</a>
+        <a href="#">隐私与条款</a>
+      </div>
+      <p class="footer-note">© 2024 星海小说. Inspired by Pixiv Novels · Crafted for better reading flow.</p>
+    </div>
+  </footer>
+
+  <div class="idea-toast" id="idea-toast" role="status" aria-live="polite">
+    灵感已捕捉，稍后可在“章节笔记”查看。
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
