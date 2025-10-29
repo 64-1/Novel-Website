@@ -7,6 +7,18 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>星海小说 · 阅读空间</title>
+  <meta name="description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="星海小说">
+  <meta property="og:title" content="星海小说">
+  <meta property="og:description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="/icons/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="星海小说">
+  <meta name="twitter:description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta name="twitter:image" content="/icons/icon-512.png">
+  <link rel="canonical" href="/">
   <link rel="modulepreload" href="/js/main.js">
   <link rel="modulepreload" href="/js/pages/readerMain.js">
   <link rel="stylesheet" href="/styles.css">
@@ -24,8 +36,22 @@
       <nav class="primary-nav">
         <a href="/index.html">返回首页</a>
       </nav>
+      <div class="search-wrap header-search" role="search">
+        <input
+          id="siteSearch"
+          placeholder="搜索书名 / 作者 / 标签…"
+          aria-label="搜索书籍"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          aria-controls="searchResults"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+      </div>
       <div class="header-actions">
-        <button class="btn ghost" data-action="open-global-search" aria-label="搜索全书">搜索</button>
         <button class="btn ghost" id="bookmarks-drawer-trigger" aria-label="书签">书签</button>
         <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
       </div>
@@ -150,6 +176,7 @@
 
   <div class="bookmark-toast" id="bookmark-toast" role="status" aria-live="polite" aria-hidden="true"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
   <script type="module" src="/js/main.js"></script>
   <script type="module" src="/js/pages/readerMain.js"></script>
 </body>

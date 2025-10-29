@@ -1,0 +1,67 @@
+[
+  {
+    "slug": "lightfall-ode",
+    "title": "晨光谱系",
+    "title_zh": "晨光谱系",
+    "title_en": "Lightfall Ode",
+    "author": "黎川",
+    "tags": [
+      "科幻",
+      "群像",
+      "慢热"
+    ],
+    "genres": [
+      "科幻"
+    ],
+    "summary": "浮城里的记忆回廊开启前夕，年轻人们尝试重塑真实与自我。",
+    "cover": null,
+    "reads": 14820,
+    "likes": 936,
+    "bookmarks": 612,
+    "chapters_count": 28,
+    "updated_at": "2024-05-14T09:00:00.000Z"
+  },
+  {
+    "slug": "tide-echoes",
+    "title": "霓虹与海",
+    "title_zh": "霓虹与海",
+    "title_en": "Tide Echoes",
+    "author": "夏茗",
+    "tags": [
+      "都市",
+      "群像",
+      "青春"
+    ],
+    "genres": [
+      "都市"
+    ],
+    "summary": "四个年轻人于夜色之城互相取暖，交织出多重人生轨迹。",
+    "cover": null,
+    "reads": 9820,
+    "likes": 754,
+    "bookmarks": 488,
+    "chapters_count": 42,
+    "updated_at": "2024-04-28T09:00:00.000Z"
+  },
+  {
+    "slug": "nocturne-resonance",
+    "title": "静夜共鸣",
+    "title_zh": "静夜共鸣",
+    "title_en": "Nocturne Resonance",
+    "author": "墨影",
+    "tags": [
+      "幻想",
+      "悬疑"
+    ],
+    "genres": [
+      "幻想"
+    ],
+    "summary": "记忆回廊开启前夜，浮城灯火下的心声汇聚成新的共鸣。",
+    "cover": null,
+    "reads": 11240,
+    "likes": 812,
+    "bookmarks": 532,
+    "chapters_count": 36,
+    "updated_at": "2024-03-30T09:00:00.000Z"
+  }
+]

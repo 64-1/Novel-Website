@@ -67,7 +67,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let preparedPrevSlug = null;
   let searchController = null;
   let searchDebounce = null;
-  let globalSearchController = null;
   let pendingSearchQuery = null;
   let annotationsController = null;
   let currentAnnTab = "bookmarks";
@@ -77,6 +76,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let fabScrollTimeout = null;
   let fabVisible = true;
   let lastScrollTop = 0;
+
+  const metaConfig = {
+    siteName: Strings?.meta?.siteName || "星海小说",
+    defaultDescription: Strings?.meta?.defaultDescription || "",
+    shareImage: Strings?.meta?.shareImage || "/icons/icon-512.png"
+  };
 
   const initialPathSlug = pathSlug();
   const initialHashSlug = getHashSlug(window.location.hash);
@@ -1034,56 +1039,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Initialize global search overlay
-  (async () => {
-    const { createGlobalSearch } = await import("../search/GlobalSearch.js");
-    globalSearchController = createGlobalSearch({
-      onNavigate: (slug, query) => {
-        // Navigate within same page
-        const url = `/novel/${encodeURIComponent(slug)}?q=${encodeURIComponent(query)}`;
-        location.href = url;
-      },
-      strings: Strings.search
-    });
-    // Set chapters repo getter for lazy loading during search
-    globalSearchController.setChaptersRepoGetter(() => ChaptersRepo);
-
-    // Add Ctrl/⌘ K shortcut handler (only when overlay not open)
-    document.addEventListener("keydown", (event) => {
-      if (event.defaultPrevented) return;
-      const isModKey = event.metaKey || event.ctrlKey;
-      const isK = event.key === "k" || event.key === "K";
-      
-      if (isModKey && isK && !event.altKey) {
-        // Only open if overlay is not already open and not in editable target
-        const target = event.target;
-        if (
-          !target ||
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable
-        ) {
-          return;
-        }
-        if (!globalSearchController?.isOpen()) {
-          event.preventDefault();
-          // Ensure chapters are loaded before opening
-          ChaptersRepo.load().then(() => {
-            globalSearchController?.open(ChaptersRepo);
-          });
-        }
-      }
-    });
-
-    // Add click handler for search button
-    const searchButton = document.querySelector('[data-action="open-global-search"]');
-    searchButton?.addEventListener("click", () => {
-      ChaptersRepo.load().then(() => {
-        globalSearchController?.open(ChaptersRepo);
-      });
-    });
-  })();
-
   loadChapters();
 
   function loadReaderSettings() {
@@ -1190,6 +1145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tocListController.setActive(safeIndex);
     readerModalController?.refreshFocusTrap();
     updateReadingTime(chapter);
+    updateChapterMeta(chapter);
     LastReadStore.set({ slug: chapter.slug });
     preparedNextSlug = null;
     preparedPrevSlug = null;
@@ -1332,6 +1288,107 @@ document.addEventListener("DOMContentLoaded", () => {
     const serialized = nextParams.toString();
     url.search = serialized ? `?${serialized}` : "";
     history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  function updateChapterMeta(chapter) {
+    if (!chapter) {
+      return;
+    }
+    const siteName = metaConfig.siteName || "星海小说";
+    const shareTitle = chapter.title || siteName;
+    const fullTitle = `${shareTitle} · ${siteName}`;
+    const description = extractChapterDescription(chapter) || metaConfig.defaultDescription || siteName;
+    const canonicalUrl = buildCanonicalUrl(chapter.slug);
+    const imageUrl = toAbsoluteUrl(metaConfig.shareImage);
+
+    document.title = fullTitle;
+    setMetaTag("name", "description", description);
+    setMetaTag("property", "og:title", shareTitle);
+    setMetaTag("property", "og:description", description);
+    setMetaTag("property", "og:type", "article");
+    setMetaTag("property", "og:url", canonicalUrl);
+    setMetaTag("property", "og:image", imageUrl);
+    setMetaTag("property", "og:site_name", siteName);
+    setMetaTag("name", "twitter:card", "summary_large_image");
+    setMetaTag("name", "twitter:title", shareTitle);
+    setMetaTag("name", "twitter:description", description);
+    setMetaTag("name", "twitter:image", imageUrl);
+    setCanonicalLink(canonicalUrl);
+  }
+
+  function extractChapterDescription(chapter) {
+    if (!chapter) {
+      return metaConfig.defaultDescription;
+    }
+    const summary = typeof chapter.summary === "string" ? chapter.summary.trim() : "";
+    if (summary) {
+      return truncateDescription(summary);
+    }
+    const paragraphs = Array.isArray(chapter.paragraphs) ? chapter.paragraphs : [];
+    for (const entry of paragraphs) {
+      let text = "";
+      if (typeof entry === "string") {
+        text = entry;
+      } else if (entry && typeof entry.text === "string") {
+        text = entry.text;
+      }
+      text = text.replace(/\s+/g, " ").trim();
+      if (text) {
+        return truncateDescription(text);
+      }
+    }
+    return metaConfig.defaultDescription;
+  }
+
+  function truncateDescription(text, maxLength = 140) {
+    const normalized = (text || "").replace(/\s+/g, " ").trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+  }
+
+  function setMetaTag(attribute, value, content) {
+    if (!value) return;
+    let tag = document.head.querySelector(`meta[${attribute}="${value}"]`);
+    if (!tag) {
+      tag = document.createElement("meta");
+      tag.setAttribute(attribute, value);
+      document.head.appendChild(tag);
+    }
+    if (typeof content === "string") {
+      tag.setAttribute("content", content);
+    }
+  }
+
+  function setCanonicalLink(url) {
+    if (!url) return;
+    let link = document.head.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "canonical");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", url);
+  }
+
+  function buildCanonicalUrl(slug) {
+    const origin = window.location.origin || "";
+    if (!slug) {
+      return origin;
+    }
+    return `${origin}/novel/${encodeURIComponent(slug)}`;
+  }
+
+  function toAbsoluteUrl(path) {
+    if (!path) {
+      return "";
+    }
+    try {
+      return new URL(path, window.location.origin).href;
+    } catch {
+      return path;
+    }
   }
 
   function resolveLastRead() {

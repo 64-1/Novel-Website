@@ -26,8 +26,22 @@
         <a href="#writer">创作者工具</a>
         <a href="#community">灵感广场</a>
       </nav>
+      <div class="search-wrap header-search" role="search">
+        <input
+          id="siteSearch"
+          placeholder="搜索书名 / 作者 / 标签…"
+          aria-label="搜索书籍"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          aria-controls="searchResults"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+      </div>
       <div class="header-actions">
-        <button class="btn ghost" data-action="open-global-search" aria-label="搜索全书">搜索</button>
         <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
         <button class="btn primary">开始创作</button>
       </div>
@@ -390,6 +404,7 @@
     灵感已捕捉，稍后可在“章节笔记”查看。
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
   <script type="module" src="./js/main.js"></script>
 </body>
 </html>

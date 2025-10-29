@@ -1,13 +1,16 @@
-const SW_VERSION = "v7";
+const SW_VERSION = "v8";
 const CACHE_NAME = `xinghai-static-${SW_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
+  "./search/index.html",
   "./read.html",
   "./styles.css",
   "./js/main.js",
   "./js/app/initApp.js",
   "./js/pages/readerMain.js",
+  "./js/pages/search.js",
+  "./js/search/popularity.js",
   "./js/services/Stores.js",
   "./js/services/ChaptersRepo.js",
   "./js/services/ThemeService.js",
@@ -21,6 +24,7 @@ const ASSETS = [
   "./js/router.js",
   "./js/strings.js",
   "./chapters.json",
+  "./data/books.json",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
@@ -104,6 +108,14 @@ self.addEventListener("fetch", (event) => {
         caches
           .match("/read.html")
           .then((cachedResponse) => cachedResponse || fetch("/read.html"))
+      );
+      return;
+    }
+    if (requestUrl.pathname === "/search" || requestUrl.pathname === "/search/") {
+      event.respondWith(
+        caches
+          .match("/search/index.html")
+          .then((cachedResponse) => cachedResponse || fetch("/search/index.html"))
       );
       return;
     }

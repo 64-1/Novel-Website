@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <title>搜索书籍 · 星海小说</title>
+  <meta name="description" content="搜索书名、作者、标签与题材，快速找到你的下一本中文原创小说。">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/index.html">
+        <span class="brand-logo">星</span>
+        星海小说
+      </a>
+      <nav class="primary-nav">
+        <a href="/index.html#discover">精选</a>
+        <a href="/index.html#reader">阅读体验</a>
+        <a href="/index.html#writer">创作工具</a>
+        <a href="/index.html#community">灵感广场</a>
+      </nav>
+      <div class="search-wrap header-search" role="search">
+        <input
+          id="siteSearch"
+          placeholder="搜索书名 / 作者 / 标签…"
+          aria-label="搜索书籍"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          aria-controls="searchResults"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+      </div>
+      <div class="header-actions">
+        <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
+        <a class="btn primary" href="/index.html#writer">开始创作</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="search-page">
+    <section class="search-hero">
+      <div class="container">
+        <p class="eyebrow">全站搜索</p>
+        <h1>找到你想读的世界</h1>
+        <p class="search-copy">搜索书名、作者、标签或主题，实时筛选符合心绪的故事。</p>
+        <form id="searchPageForm" class="search-page-form" role="search">
+          <label class="visually-hidden" for="searchPageInput">搜索书籍</label>
+          <input
+            id="searchPageInput"
+            name="q"
+            placeholder="例如：科幻 慢热 浮城"
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </form>
+        <p id="searchPageStatus" class="search-status" role="status" aria-live="polite"></p>
+        <div class="search-toolbar">
+          <label for="sortBy" class="sort-label">排序</label>
+          <select id="sortBy" name="sort">
+            <option value="pop">热度优先</option>
+            <option value="updated">最新更新</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="search-results">
+      <div class="container">
+        <div id="searchPageResults" class="search-results-list" role="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-logo">星</span>
+        <div>
+          <strong>星海小说</strong>
+          <p>让中文原创在温柔的光里闪耀。</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="/index.html#writer">创作者中心</a>
+        <a href="/index.html#community">灵感广场</a>
+        <a href="/index.html#discover">发现小说</a>
+        <a href="/index.html#reader">阅读体验</a>
+      </div>
+      <p class="footer-note">© 2024 星海小说. Inspired by Pixiv Novels · Crafted for better reading flow.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/pages/search.js"></script>
+</body>
+</html>

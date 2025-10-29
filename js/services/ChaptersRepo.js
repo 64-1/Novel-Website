@@ -51,7 +51,7 @@ const FALLBACK_CHAPTERS = [
 ];
 
 const DEFAULT_OPTIONS = {
-  url: "chapters.json",
+  url: "/chapters.json",
   fallback: FALLBACK_CHAPTERS
 };
 

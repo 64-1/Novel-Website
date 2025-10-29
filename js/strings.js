@@ -10,6 +10,11 @@ const Strings = {
     refresh: "刷新",
     later: "稍后"
   },
+  meta: {
+    siteName: "星海小说",
+    defaultDescription: "沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。",
+    shareImage: "/icons/icon-512.png"
+  },
   toasts: {
     ideaCaptured: "灵感已捕捉，稍后可在「章节笔记」查看。",
     musicLoading: (mood) => `已为你准备「${mood}」氛围音轨，正式版即将上线。`
