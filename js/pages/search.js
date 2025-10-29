@@ -14,7 +14,9 @@ const sortSelect = document.getElementById("sortBy");
 if (form && resultsContainer) {
   const initialParams = new URLSearchParams(window.location.search);
   const initialQuery = initialParams.get("q") || "";
-  const initialSortParam = initialParams.get("sort") === "updated" ? "updated" : "pop";
+  const allowedSortModes = new Set(["trending", "pop", "updated"]);
+  const requestedSort = initialParams.get("sort") || "";
+  const initialSortParam = allowedSortModes.has(requestedSort) ? requestedSort : "trending";
   if (input) {
     input.value = initialQuery;
     if (!input.placeholder && searchStrings.placeholder) {
@@ -201,7 +203,7 @@ if (form && resultsContainer) {
     } else {
       params.delete("q");
     }
-    if (sortValue && sortValue !== "pop") {
+    if (sortValue && sortValue !== "trending") {
       params.set("sort", sortValue);
     } else {
       params.delete("sort");
@@ -252,7 +254,8 @@ if (form && resultsContainer) {
   if (sortSelect) {
     sortSelect.value = sortMode;
     sortSelect.addEventListener("change", (event) => {
-      const value = event.target.value === "updated" ? "updated" : "pop";
+      const raw = event.target.value;
+      const value = allowedSortModes.has(raw) ? raw : "trending";
       sortMode = value;
       updateUrlParams(input?.value.trim() || "", sortMode);
       runSearch(input?.value || "");

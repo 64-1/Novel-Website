@@ -1,5 +1,6 @@
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const FRESHNESS_WINDOW_DAYS = 365;
+const TRENDING_HALF_LIFE_DAYS = 30;
 
 function toNumber(value) {
   const num = Number(value);
@@ -39,11 +40,30 @@ function updatedAtValue(item = {}) {
   return ts;
 }
 
+export function trendingScore(item = {}) {
+  const base = popularityScore(item);
+  const reads = Math.max(0, toNumber(item.reads));
+  const likes = Math.max(0, toNumber(item.likes));
+  const bookmarks = Math.max(0, toNumber(item.bookmarks));
+  const updated = toTimestamp(item.updated_at);
+
+  const engagement =
+    Math.log1p(reads) * 0.75 + Math.log1p(likes * 2 + bookmarks * 2.5) * 1.35;
+
+  let decay = 0.35; // default bias so older titles still surface slightly
+  if (updated) {
+    const ageDays = Math.max(0, (Date.now() - updated) / MS_PER_DAY);
+    decay = Math.pow(0.5, ageDays / TRENDING_HALF_LIFE_DAYS);
+  }
+
+  return base * 0.55 + engagement * decay * 1.45;
+}
+
 /**
  * Sorts search results.
  * @param {Array} list - Array of raw items or Fuse results.
  * @param {Object} options
- * @param {string} [options.mode="pop"] - "pop" | "updated"
+ * @param {string} [options.mode="pop"] - "trending" | "pop" | "updated"
  * @param {boolean} [options.isFuse=false] - Whether entries are Fuse search result objects.
  * @returns {Array}
  */
@@ -55,12 +75,20 @@ export function sortResults(list = [], { mode = "pop", isFuse = false } = {}) {
       item,
       index,
       score: popularityScore(item),
-      updated: updatedAtValue(item)
+      updated: updatedAtValue(item),
+      trending: trendingScore(item)
     };
   });
 
   decorated.sort((a, b) => {
-    if (mode === "updated") {
+    if (mode === "trending") {
+      if (b.trending !== a.trending) {
+        return b.trending - a.trending;
+      }
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+    } else if (mode === "updated") {
       if (b.updated !== a.updated) {
         return b.updated - a.updated;
       }
