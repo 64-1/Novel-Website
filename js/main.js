@@ -91,9 +91,10 @@ function initSiteSearch(strings = {}) {
   }
 
   function hidePanel() {
+    panel.classList.remove("open", "scrollable");
+    panel.innerHTML = "";
     panel.hidden = true;
     updateExpanded(false);
-    panel.innerHTML = "";
     activeIndex = -1;
     currentItems = [];
   }
@@ -146,11 +147,17 @@ function initSiteSearch(strings = {}) {
   }
 
   function renderResults(results) {
-    const items = results.slice(0, 10).map((entry) => ensureItemArray(entry)).filter(Boolean);
+    panel.classList.remove("open", "scrollable");
+    panel.innerHTML = "";
+
+    const items = Array.isArray(results)
+      ? results.slice(0, 10).map((entry) => ensureItemArray(entry)).filter(Boolean)
+      : [];
     currentItems = items;
 
     if (!items.length) {
       panel.innerHTML = `<div class="result-empty" role="option" aria-disabled="true">${zeroLabel}</div>`;
+      panel.classList.add("open");
       showPanel();
       clearActive();
       return;
@@ -195,8 +202,9 @@ function initSiteSearch(strings = {}) {
       })
       .join("");
     panel.innerHTML = template;
-    showPanel();
     clearActive();
+    panel.classList.add("open");
+    showPanel();
 
     panel.querySelectorAll(".result-item").forEach((option) => {
       option.addEventListener("mouseenter", () => {
@@ -205,6 +213,14 @@ function initSiteSearch(strings = {}) {
           setActive(index);
         }
       });
+    });
+
+    requestAnimationFrame(() => {
+      if (panel.hidden) {
+        return;
+      }
+      const needsScroll = panel.scrollHeight > panel.clientHeight + 2;
+      panel.classList.toggle("scrollable", needsScroll);
     });
   }
 
@@ -297,7 +313,7 @@ function initSiteSearch(strings = {}) {
   }
 
   async function runSearch(rawQuery) {
-    const query = rawQuery.trim();
+    const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
     if (!query) {
       hidePanel();
       return;

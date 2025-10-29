@@ -208,6 +208,8 @@ a {
   color: var(--text-body, #334155);
   font-size: 15px;
   transition: box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+  z-index: 51;
 }
 
 #siteSearch:focus {
@@ -218,16 +220,34 @@ a {
 
 .results-panel {
   position: absolute;
-  inset: auto 0 0;
+  left: 0;
+  right: 0;
   top: calc(100% + 8px);
   background: var(--surface, #ffffff);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 16px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
   max-height: 60vh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 8px;
   z-index: 50;
+}
+
+#searchResults {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#searchResults[hidden] {
+  display: none !important;
+}
+
+#searchResults:empty {
+  display: none !important;
+}
+
+#searchResults.open.scrollable {
+  overflow: auto;
 }
 
 .result-item {
