@@ -1,15 +1,8 @@
 import { buildTextMap } from "./TextMap.js";
+import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
+import { LIMITS, TIMING } from "../utils/constants.js";
 
-const MAX_HIGHLIGHTS_PER_CHAPTER = 500;
-
-/**
- * Escapes HTML to prevent XSS
- */
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text || "";
-  return div.innerHTML;
-}
+const MAX_HIGHLIGHTS_PER_CHAPTER = LIMITS.MAX_HIGHLIGHTS_PER_CHAPTER;
 
 /**
  * Unwraps all highlight marks
@@ -146,7 +139,7 @@ export function createAnnotations({ articleEl, store, textMapBuilder = buildText
     // Remove current class after a delay
     setTimeout(() => {
       mark.classList.remove("is-current");
-    }, 2000);
+    }, TIMING.HIGHLIGHT_FLASH_DURATION);
 
     return true;
   }

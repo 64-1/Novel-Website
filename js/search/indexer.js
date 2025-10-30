@@ -1,3 +1,5 @@
+import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
+
 const SNIPPET_CHARS_BEFORE = 30;
 const SNIPPET_CHARS_AFTER = 40;
 const MAX_SNIPPETS_PER_CHAPTER = 5;
@@ -62,15 +64,6 @@ function extractSnippet(text, matchIndex, matchLength, charsBefore, charsAfter) 
   const match = text.slice(matchIndex, matchIndex + matchLength);
   const after = text.slice(matchIndex + matchLength, end);
   return { before, match, after };
-}
-
-/**
- * Escapes HTML to prevent XSS
- */
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 /**

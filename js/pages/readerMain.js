@@ -10,6 +10,9 @@ import { createAnnotations } from "../reader/Annotations.js";
 import { initShortcuts } from "../services/Shortcuts.js";
 import { startRouter, linkToChapter } from "../router.js";
 import Strings from "../strings.js";
+import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
+import { LIMITS, TIMING, READING } from "../utils/constants.js";
+import { formatRelativeTime } from "../utils/formatters.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
@@ -37,8 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchNextBtn = document.getElementById("chap-search-next");
   const searchClearBtn = document.getElementById("chap-search-clear");
   const searchStatus = document.getElementById("chap-search-status");
-  const SEARCH_HIGHLIGHT_CAP = 200;
-  const SEARCH_DEBOUNCE_MS = 160;
+  const SEARCH_HIGHLIGHT_CAP = LIMITS.SEARCH_HIGHLIGHT_CAP;
+  const SEARCH_DEBOUNCE_MS = TIMING.SEARCH_DEBOUNCE;
   const addBookmarkBtn = document.getElementById("add-bookmark");
   const selectionPopover = document.getElementById("selection-popover");
   const highlightSelectionBtn = document.getElementById("highlight-selection");
@@ -691,12 +694,6 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       ).catch(() => {});
     }
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text || "";
-    return div.innerHTML;
   }
 
   // Bookmarks Drawer

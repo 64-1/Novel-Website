@@ -1,5 +1,8 @@
 import Strings from "../strings.js";
 import { sortResults } from "../search/popularity.js";
+import { escapeHtml } from "../utils/htmlSanitize.js";
+import { createCatalogSearch } from "../services/SearchConfig.js";
+import { truncate } from "../utils/formatters.js";
 
 const searchStrings = Strings?.search || {};
 const FuseConstructor = window.Fuse;
@@ -32,18 +35,6 @@ if (form && resultsContainer) {
   let currentQuery = initialQuery.trim();
   let sortMode = initialSortParam;
 
-  function escapeHtml(value) {
-    if (value === null || value === undefined) {
-      return "";
-    }
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
   async function ensureCatalog() {
     if (catalog.length) {
       return catalog;
@@ -64,22 +55,7 @@ if (form && resultsContainer) {
           throw new Error("Catalog must be an array");
         }
         catalog = data.filter((entry) => entry && entry.slug);
-        if (FuseConstructor && typeof FuseConstructor === "function") {
-          fuse = new FuseConstructor(catalog, {
-            includeScore: true,
-            threshold: 0.32,
-            ignoreLocation: true,
-            keys: [
-              { name: "title", weight: 0.6 },
-              { name: "title_zh", weight: 0.6 },
-              { name: "title_en", weight: 0.45 },
-              { name: "author", weight: 0.5 },
-              { name: "tags", weight: 0.3 },
-              { name: "genres", weight: 0.2 },
-              { name: "summary", weight: 0.15 }
-            ]
-          });
-        }
+        fuse = createCatalogSearch(FuseConstructor, catalog);
         return catalog;
       })
       .catch((error) => {
@@ -135,14 +111,6 @@ if (form && resultsContainer) {
       return;
     }
     statusEl.innerHTML = `关于 “${safeQuery}” 的 ${count} 条匹配结果。`;
-  }
-
-  function truncate(text, maxLength = 140) {
-    if (!text) return "";
-    if (text.length <= maxLength) {
-      return text;
-    }
-    return `${text.slice(0, maxLength - 1).trimEnd()}…`;
   }
 
   function renderResults(items, query) {

@@ -5,6 +5,7 @@ import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
 import { createAnnotations } from "../reader/Annotations.js";
 import Strings from "../strings.js";
+import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
 const HIGHLIGHT_COLORS = ["ylw", "grn", "blu", "pnk"];
 const HIGHLIGHT_COLOR_LABELS = Strings.annotations.highlightColors || {};
@@ -900,9 +901,4 @@ async function initImmersiveReader() {
     }
   }
 
-  function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text || "";
-    return div.innerHTML;
-  }
 }

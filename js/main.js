@@ -16,6 +16,9 @@ import { startRouter, linkToChapter } from "./router.js";
 import Strings from "./strings.js";
 import { initApp } from "./app/initApp.js";
 import { sortResults, trendingScore } from "./search/popularity.js";
+import { escapeHtml } from "./utils/htmlSanitize.js";
+import { TIMING } from "./utils/constants.js";
+import { createCatalogSearch } from "./services/SearchConfig.js";
 
 const stores = {
   ReaderSettingsStore,
@@ -61,7 +64,7 @@ function initSiteSearch(strings = {}) {
   const FuseConstructor = window.Fuse;
   const catalogUrl = "/data/books.json";
   const zeroLabel = strings.noResults || "未找到相关书籍";
-  const debounceDelay = 220;
+  const debounceDelay = TIMING.CATALOG_SEARCH_DEBOUNCE;
   const telemetryUrl = "/analytics/search";
 
   let catalog = [];
@@ -70,18 +73,6 @@ function initSiteSearch(strings = {}) {
   let debounceTimer = null;
   let activeIndex = -1;
   let currentItems = [];
-
-  function escapeHtml(value) {
-    if (value === null || value === undefined) {
-      return "";
-    }
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
 
   if (!input.placeholder && strings.placeholder) {
     input.placeholder = strings.placeholder;
@@ -247,22 +238,7 @@ function initSiteSearch(strings = {}) {
           throw new Error("Catalog response must be an array");
         }
         catalog = data.filter((entry) => entry && entry.slug);
-        if (FuseConstructor && typeof FuseConstructor === "function") {
-          fuse = new FuseConstructor(catalog, {
-            includeScore: true,
-            threshold: 0.32,
-            ignoreLocation: true,
-            keys: [
-              { name: "title", weight: 0.6 },
-              { name: "title_zh", weight: 0.6 },
-              { name: "title_en", weight: 0.45 },
-              { name: "author", weight: 0.5 },
-              { name: "tags", weight: 0.3 },
-              { name: "genres", weight: 0.2 },
-              { name: "summary", weight: 0.15 }
-            ]
-          });
-        }
+        fuse = createCatalogSearch(FuseConstructor, catalog);
         return catalog;
       })
       .catch((error) => {
