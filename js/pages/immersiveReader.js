@@ -304,6 +304,9 @@ async function initImmersiveReader() {
     if (target.closest("[data-action='delete']")) {
       event.stopPropagation();
       if (annotationsController.remove(id)) {
+        if (currentChapterSlug) {
+          annotationsController.applyForChapter(currentChapterSlug);
+        }
         showToast(Strings.annotations.removed);
         refreshAnnotationsUI();
       }
@@ -323,6 +326,8 @@ async function initImmersiveReader() {
     }
   });
 
+  let lastBookmarkKeyTime = 0;
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       if (drawerOpen) {
@@ -334,6 +339,18 @@ async function initImmersiveReader() {
         hideHighlightPopover();
         window.getSelection()?.removeAllRanges();
         event.preventDefault();
+      }
+      return;
+    }
+
+    if (event.key.toLowerCase() === "b" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const now = Date.now();
+      if (now - lastBookmarkKeyTime <= 400) {
+        event.preventDefault();
+        handleBookmarkCreation();
+        lastBookmarkKeyTime = 0;
+      } else {
+        lastBookmarkKeyTime = now;
       }
     }
   });
