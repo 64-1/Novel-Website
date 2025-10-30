@@ -1177,7 +1177,7 @@ export function initApp({
         return;
       }
       navigator.serviceWorker
-        .register("service-worker.js")
+        .register("/service-worker.js")
         .catch((error) => {
           console.warn("Service worker registration failed:", error);
         });
