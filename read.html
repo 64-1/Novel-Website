@@ -3,181 +3,80 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#3a70ff">
+  <meta name="theme-color" content="#e5d6b6">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <title>星海小说 · 阅读空间</title>
+  <title>星海小说 · 沉浸式阅读</title>
   <meta name="description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="星海小说">
-  <meta property="og:title" content="星海小说">
+  <meta property="og:title" content="星海小说 · 沉浸式阅读">
   <meta property="og:description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
   <meta property="og:url" content="">
   <meta property="og:image" content="/icons/icon-512.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="星海小说">
+  <meta name="twitter:title" content="星海小说 · 沉浸式阅读">
   <meta name="twitter:description" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
   <meta name="twitter:image" content="/icons/icon-512.png">
-  <link rel="canonical" href="/">
+  <link rel="canonical" href="/read.html">
   <link rel="modulepreload" href="/js/main.js">
-  <link rel="modulepreload" href="/js/pages/readerMain.js">
+  <link rel="modulepreload" href="/js/pages/immersiveReader.js">
   <link rel="stylesheet" href="/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 </head>
-<body>
-  <header class="site-header">
-    <div class="container header-inner">
-      <a class="brand" href="/index.html">
-        <span class="brand-logo">星</span>
-        星海小说
-      </a>
-      <nav class="primary-nav">
-        <a href="/index.html">返回首页</a>
-      </nav>
-      <div class="search-wrap header-search" role="search">
-        <input
-          id="siteSearch"
-          placeholder="搜索书名 / 作者 / 标签…"
-          aria-label="搜索书籍"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded="false"
-          aria-haspopup="listbox"
-          aria-controls="searchResults"
-          autocomplete="off"
-          spellcheck="false"
-        >
-        <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+<body class="immersive-reader" data-reader-theme="sepia">
+  <main class="immersive-layout">
+    <header class="immersive-topbar" data-layer="chrome" data-chrome-surface hidden>
+      <button class="topbar-btn" type="button" data-action="back" aria-label="返回上一页">
+        <span class="topbar-icon topbar-icon--back" aria-hidden="true"></span>
+      </button>
+      <div class="topbar-meta">
+        <span class="topbar-meta__label" data-chapter-index>开始</span>
+        <h1 class="topbar-meta__title" data-chapter-title>章节标题</h1>
+        <p class="topbar-meta__hint" data-chapter-meta></p>
       </div>
-      <div class="header-actions">
-        <button class="btn ghost" id="bookmarks-drawer-trigger" aria-label="书签">书签</button>
-        <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
-      </div>
-    </div>
-  </header>
+      <button class="topbar-btn" type="button" data-action="share" aria-label="分享章节">
+        <span class="topbar-icon topbar-icon--share" aria-hidden="true"></span>
+      </button>
+    </header>
 
-  <main>
-    <section class="reader-lab" id="reader">
-      <div class="container section-header">
-        <div>
-          <p class="eyebrow">阅读空间</p>
-          <h2>沉浸式章节阅读</h2>
-          <p class="section-subtitle">
-            自适应排版、渐进式章节导航与沉浸式主题，为长篇阅读打造舒展的节奏。
-          </p>
-        </div>
-        <div class="reader-controls-top">
-          <button class="btn secondary" data-action="toggle-reader-layout">切换宽屏</button>
-          <button class="btn ghost" data-action="open-reader">全屏演示</button>
-        </div>
-      </div>
-      <div class="container reader-grid">
-        <aside class="toc">
-          <h4>章节目录</h4>
-          <ol></ol>
-          <div class="reader-stats">
-            <p>已读进度</p>
-            <div class="progress-bar slim" data-progress="reader" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="章节阅读进度">
-              <span class="progress-fill"></span>
-            </div>
-            <small data-reading-time>预计剩余阅读时间：--</small>
-          </div>
-          <div class="annotations-panel">
-            <div class="annotations-tabs">
-              <button class="ann-tab active" data-tab="bookmarks" aria-label="书签">
-                <span>书签</span>
-                <span class="ann-count" id="bookmark-count">0</span>
-              </button>
-              <button class="ann-tab" data-tab="highlights" aria-label="高亮">
-                <span>高亮</span>
-                <span class="ann-count" id="highlight-count">0</span>
-              </button>
-            </div>
-            <div class="annotations-list" id="annotations-list" role="list" aria-live="polite"></div>
-          </div>
-        </aside>
-        <article class="reader-panel">
-          <header class="reader-toolbar">
-            <div class="toolbar-group">
-              <label>字号
-                <input type="range" min="16" max="24" value="18" data-action="font-size">
-              </label>
-              <label>行距
-                <input type="range" min="1.4" max="2" step="0.1" value="1.6" data-action="line-height">
-              </label>
-            </div>
-            <div class="toolbar-group theme-toggle">
-              <button class="pill active" data-theme="day">晨光</button>
-              <button class="pill" data-theme="dusk">暮色</button>
-              <button class="pill" data-theme="night">星夜</button>
-            </div>
-            <div class="toolbar-group annotation-actions">
-              <button id="add-bookmark" class="btn ghost small" data-action="add-bookmark" aria-label="添加书签">书签</button>
-            </div>
-            <div class="toolbar-group reader-search">
-              <label class="visually-hidden" for="chap-search">搜索本章</label>
-              <input id="chap-search" type="search" placeholder="搜索本章…" autocomplete="off" spellcheck="false">
-              <div class="search-controls">
-                <button id="chap-search-prev" type="button" aria-label="上一个命中">‹</button>
-                <button id="chap-search-next" type="button" aria-label="下一个命中">›</button>
-                <button id="chap-search-clear" type="button" aria-label="清除搜索">×</button>
-              </div>
-              <span id="chap-search-status" role="status" aria-live="polite" aria-atomic="true"></span>
-            </div>
-          </header>
-          <div class="reader-content" data-theme="day"></div>
-          <div class="selection-popover" id="selection-popover" aria-hidden="true" role="toolbar">
-            <button id="highlight-selection" class="btn small" aria-label="高亮选中文本">高亮</button>
-            <button id="add-note" class="btn small secondary" aria-label="添加备注">备注</button>
-          </div>
-        </article>
+    <section class="immersive-stage" data-stage>
+      <div class="immersive-scroll" id="immersiveScroll">
+        <article class="immersive-article" id="immersiveArticle"></article>
       </div>
     </section>
-  </main>
 
-  <div class="reader-modal" id="reader-modal" aria-hidden="true">
-    <div class="modal-backdrop" data-action="close-modal"></div>
-    <div class="modal-content" role="dialog" aria-modal="true" aria-label="全屏阅读模式">
-      <button class="modal-close" data-action="close-modal">×</button>
-      <div class="modal-progress">
-        <div class="progress-bar slim" data-progress="modal" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="全屏阅读进度">
-          <span class="progress-fill"></span>
+    <footer class="immersive-toolbar" data-layer="chrome" data-chrome-surface hidden>
+      <div class="toolbar-row toolbar-row--nav">
+        <button class="toolbar-btn" type="button" data-action="prev-chapter">上一章</button>
+        <div class="progress-group">
+          <div class="immersive-progress" data-progress="immersive" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="阅读进度">
+            <span class="progress-track"></span>
+            <span class="progress-fill"></span>
+          </div>
+          <span class="progress-label" data-progress-label>0%</span>
+        </div>
+        <button class="toolbar-btn" type="button" data-action="next-chapter">下一章</button>
+      </div>
+      <div class="toolbar-row toolbar-row--settings">
+        <div class="theme-group">
+          <button class="theme-pill active" type="button" data-reader-theme="sepia">纸感</button>
+          <button class="theme-pill" type="button" data-reader-theme="day">晨光</button>
+          <button class="theme-pill" type="button" data-reader-theme="night">夜间</button>
+        </div>
+        <div class="slider-group">
+          <label for="fontSizeControl">字号</label>
+          <input id="fontSizeControl" type="range" min="17" max="24" value="20" step="1" data-action="font-size">
+          <span class="slider-value" data-font-size-display>20px</span>
         </div>
       </div>
-      <div class="modal-reader">
-        <aside class="modal-toc"></aside>
-        <article class="modal-article"></article>
-      </div>
-    </div>
-  </div>
-
-  <div class="bookmarks-drawer" id="bookmarks-drawer" aria-hidden="true">
-    <div class="drawer-backdrop" data-action="close-drawer"></div>
-    <div class="drawer-content" role="dialog" aria-modal="true" aria-label="书签列表">
-      <div class="drawer-header">
-        <h3>书签</h3>
-        <button class="drawer-close" data-action="close-drawer" aria-label="关闭">×</button>
-      </div>
-      <div class="drawer-tabs">
-        <button class="drawer-tab active" data-filter="all">全部</button>
-        <button class="drawer-tab" data-filter="current">本章</button>
-      </div>
-      <div class="drawer-body">
-        <div class="drawer-list" id="bookmarks-drawer-list" role="list" aria-live="polite"></div>
-      </div>
-    </div>
-  </div>
-
-  <button class="fab-add-bookmark" id="fab-add-bookmark" aria-label="添加书签" aria-hidden="true">
-    <span class="fab-icon">+</span>
-  </button>
-
-  <div class="bookmark-toast" id="bookmark-toast" role="status" aria-live="polite" aria-hidden="true"></div>
+    </footer>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
   <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/pages/readerMain.js"></script>
+  <script type="module" src="/js/pages/immersiveReader.js"></script>
 </body>
 </html>

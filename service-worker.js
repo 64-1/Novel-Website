@@ -1,4 +1,4 @@
-const SW_VERSION = "v8";
+const SW_VERSION = "v9";
 const CACHE_NAME = `xinghai-static-${SW_VERSION}`;
 const ASSETS = [
   "./",
@@ -8,7 +8,7 @@ const ASSETS = [
   "./styles.css",
   "./js/main.js",
   "./js/app/initApp.js",
-  "./js/pages/readerMain.js",
+  "./js/pages/immersiveReader.js",
   "./js/pages/search.js",
   "./js/search/popularity.js",
   "./js/services/Stores.js",
