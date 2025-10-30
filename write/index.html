@@ -203,6 +203,24 @@
                 <option value="piano">钢琴 · 温柔晨光</option>
               </select>
             </div>
+            <div class="volume-control">
+              <label for="music-volume" class="volume-label">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3.5v9M5.5 6L8 3.5 10.5 6M8 3.5c2.5 0 4.5 2 4.5 4.5s-2 4.5-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                音量
+              </label>
+              <input
+                type="range"
+                id="music-volume"
+                class="volume-slider"
+                min="0"
+                max="100"
+                value="50"
+                aria-label="音量控制"
+              >
+              <span class="volume-value" id="volume-value">50%</span>
+            </div>
             <button class="btn secondary" data-action="play-music">
               <span class="btn-icon"></span>
               <span class="btn-label">播放预设</span>
