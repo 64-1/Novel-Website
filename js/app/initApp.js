@@ -2,6 +2,7 @@ export function initApp({
   stores,
   chaptersRepo,
   themeService,
+  audioPlayer,
   createProgressTracker,
   createReaderView,
   createTocList,
@@ -22,6 +23,9 @@ export function initApp({
   }
   if (!themeService) {
     throw new Error("initApp requires themeService");
+  }
+  if (!audioPlayer) {
+    throw new Error("initApp requires audioPlayer");
   }
   if (typeof createProgressTracker !== "function") {
     throw new Error("initApp requires createProgressTracker function");
@@ -85,6 +89,8 @@ export function initApp({
     const musicSelect = document.getElementById("music-mood");
     const playMusicButton = document.querySelector('[data-action="play-music"]');
     const playMusicButtonLabel = playMusicButton?.querySelector(".btn-label");
+    const volumeSlider = document.getElementById("music-volume");
+    const volumeValue = document.getElementById("volume-value");
 
     if (musicSelect) {
       enhanceMusicSelect(musicSelect);
@@ -312,23 +318,77 @@ export function initApp({
       showToast(Strings?.toasts?.ideaCaptured || "灵感已捕捉，稍后可在“章节笔记”查看。");
     });
 
-    playMusicButton?.addEventListener("click", () => {
-      const mood = musicSelect?.options[musicSelect.selectedIndex]?.text || "氛围配乐";
-      const musicMessage =
-        (Strings?.toasts?.musicLoading && Strings.toasts.musicLoading(mood)) ||
-        `已为你准备「${mood}」氛围音轨，正式版即将上线。`;
-      showToast(musicMessage);
-      if (playMusicButtonLabel) {
-        playMusicButtonLabel.textContent = "播放中...";
+    // Music player functionality
+    function updateMusicButtonUI() {
+      if (!playMusicButton || !playMusicButtonLabel) return;
+
+      const isPlaying = audioPlayer.getIsPlaying();
+      const currentTrack = audioPlayer.getCurrentTrack();
+      const selectedTrack = musicSelect?.value;
+
+      if (isPlaying && currentTrack === selectedTrack) {
+        playMusicButtonLabel.textContent = "暂停播放";
+        playMusicButton.classList.add("playing");
+      } else {
+        playMusicButtonLabel.textContent = "播放预设";
+        playMusicButton.classList.remove("playing");
       }
-      playMusicButton.disabled = true;
-      setTimeout(() => {
-        if (playMusicButtonLabel) {
-          playMusicButtonLabel.textContent = "播放预设";
+    }
+
+    // Initialize button state
+    if (playMusicButton && audioPlayer) {
+      updateMusicButtonUI();
+
+      // Listen to audio player events
+      audioPlayer.addEventListener('play', updateMusicButtonUI);
+      audioPlayer.addEventListener('pause', updateMusicButtonUI);
+    }
+
+    playMusicButton?.addEventListener("click", async () => {
+      const selectedTrack = musicSelect?.value || "ambient";
+      const mood = musicSelect?.options[musicSelect.selectedIndex]?.text || "氛围配乐";
+
+      try {
+        const isPlaying = await audioPlayer.toggle(selectedTrack);
+
+        if (isPlaying) {
+          const musicMessage = `正在播放「${mood}」`;
+          showToast(musicMessage);
+        } else {
+          showToast("音乐已暂停");
         }
-        playMusicButton.disabled = false;
-      }, 2200);
+
+        updateMusicButtonUI();
+      } catch (err) {
+        console.warn('Music playback failed:', err);
+        showToast("音乐加载失败，请稍后再试");
+        updateMusicButtonUI();
+      }
     });
+
+    // Update button when music selection changes
+    musicSelect?.addEventListener("change", () => {
+      updateMusicButtonUI();
+    });
+
+    // Volume control functionality
+    if (volumeSlider && audioPlayer) {
+      // Initialize volume from saved state
+      const currentVolume = audioPlayer.getVolume();
+      volumeSlider.value = Math.round(currentVolume * 100);
+      if (volumeValue) {
+        volumeValue.textContent = `${Math.round(currentVolume * 100)}%`;
+      }
+
+      // Handle volume changes
+      volumeSlider.addEventListener("input", (e) => {
+        const volume = parseInt(e.target.value, 10);
+        audioPlayer.setVolume(volume / 100);
+        if (volumeValue) {
+          volumeValue.textContent = `${volume}%`;
+        }
+      });
+    }
 
     function enhanceMusicSelect(nativeSelect) {
       const container = nativeSelect.closest("[data-music-select]");
@@ -1117,7 +1177,7 @@ export function initApp({
         return;
       }
       navigator.serviceWorker
-        .register("service-worker.js")
+        .register("/service-worker.js")
         .catch((error) => {
           console.warn("Service worker registration failed:", error);
         });

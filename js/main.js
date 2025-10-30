@@ -6,6 +6,7 @@ import {
 } from "./services/Stores.js";
 import ChaptersRepo from "./services/ChaptersRepo.js";
 import ThemeService from "./services/ThemeService.js";
+import AudioPlayer from "./services/AudioPlayer.js";
 import { createTracker } from "./reader/ProgressTracker.js";
 import { createReaderView } from "./reader/ReaderView.js";
 import { createTocList } from "./reader/TocList.js";
@@ -37,6 +38,7 @@ if (shouldInitLandingApp) {
     stores,
     chaptersRepo: ChaptersRepo,
     themeService: ThemeService,
+    audioPlayer: AudioPlayer,
     createProgressTracker: createTracker,
     createReaderView,
     createTocList,

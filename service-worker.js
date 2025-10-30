@@ -1,4 +1,4 @@
-const SW_VERSION = "v9";
+const SW_VERSION = "v10";
 const CACHE_NAME = `xinghai-static-${SW_VERSION}`;
 const ASSETS = [
   "./",
@@ -14,6 +14,7 @@ const ASSETS = [
   "./js/services/Stores.js",
   "./js/services/ChaptersRepo.js",
   "./js/services/ThemeService.js",
+  "./js/services/AudioPlayer.js",
   "./js/services/Shortcuts.js",
   "./js/reader/ProgressTracker.js",
   "./js/reader/ReaderView.js",
