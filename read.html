@@ -47,6 +47,12 @@
       <div class="immersive-scroll" id="immersiveScroll">
         <article class="immersive-article" id="immersiveArticle"></article>
       </div>
+      <div class="highlight-popover" id="highlightPopover" role="toolbar" aria-hidden="true">
+        <button class="highlight-swatch highlight-swatch--ylw" type="button" data-color="ylw" aria-label="琥珀高亮"></button>
+        <button class="highlight-swatch highlight-swatch--grn" type="button" data-color="grn" aria-label="松柏高亮"></button>
+        <button class="highlight-swatch highlight-swatch--blu" type="button" data-color="blu" aria-label="雾蓝高亮"></button>
+        <button class="highlight-swatch highlight-swatch--pnk" type="button" data-color="pnk" aria-label="烟粉高亮"></button>
+      </div>
     </section>
 
     <footer class="immersive-toolbar" data-layer="chrome" data-chrome-surface hidden>
@@ -62,19 +68,62 @@
         <button class="toolbar-btn" type="button" data-action="next-chapter">下一章</button>
       </div>
       <div class="toolbar-row toolbar-row--settings">
-        <div class="theme-group">
-          <button class="theme-pill active" type="button" data-reader-theme="sepia">纸感</button>
-          <button class="theme-pill" type="button" data-reader-theme="day">晨光</button>
-          <button class="theme-pill" type="button" data-reader-theme="night">夜间</button>
-        </div>
         <div class="slider-group">
           <label for="fontSizeControl">字号</label>
           <input id="fontSizeControl" type="range" min="17" max="24" value="20" step="1" data-action="font-size">
           <span class="slider-value" data-font-size-display>20px</span>
         </div>
+        <button class="toolbar-btn toolbar-btn--ghost toolbar-btn--wide" type="button" data-action="toggle-annotations" aria-expanded="false" aria-controls="annotationDrawerPanel">
+          <span>书签 · 标注 · 目录</span>
+          <span class="toolbar-badge" data-annotation-count hidden>0</span>
+        </button>
+        <div class="theme-group">
+          <button class="theme-pill active" type="button" data-reader-theme="sepia">纸感</button>
+          <button class="theme-pill" type="button" data-reader-theme="day">晨光</button>
+          <button class="theme-pill" type="button" data-reader-theme="night">夜间</button>
+        </div>
       </div>
     </footer>
   </main>
+
+  <aside class="annotations-drawer" id="annotationDrawer" aria-hidden="true">
+    <div class="annotations-drawer__backdrop" data-action="close-annotations"></div>
+    <div
+      class="annotations-drawer__panel"
+      id="annotationDrawerPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="annotationDrawerTitle"
+      tabindex="-1"
+    >
+      <header class="annotations-drawer__header">
+        <div>
+          <h2 id="annotationDrawerTitle">标注</h2>
+          <p class="annotations-drawer__subtitle">高亮与书签都会在这里集中管理</p>
+        </div>
+        <div class="annotations-drawer__actions">
+          <button class="annotations-drawer__bookmark" type="button" data-action="drawer-add-bookmark" aria-label="添加书签">＋</button>
+          <button class="annotations-drawer__close" type="button" data-action="close-annotations" aria-label="关闭标注面板">×</button>
+        </div>
+      </header>
+      <div class="annotations-drawer__tabs" role="tablist">
+        <button class="drawer-tab active" type="button" role="tab" aria-selected="true" data-annotation-tab="highlights">
+          高亮
+          <span class="drawer-tab__count" data-count="highlights">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="bookmarks">
+          书签
+          <span class="drawer-tab__count" data-count="bookmarks">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="toc">
+          目录
+        </button>
+      </div>
+      <div class="annotations-drawer__body" id="annotationList" role="list"></div>
+    </div>
+  </aside>
+
+  <div class="immersive-toast" id="immersiveToast" aria-live="polite" aria-hidden="true"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
   <script type="module" src="/js/main.js"></script>

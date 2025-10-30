@@ -34,6 +34,17 @@ const Strings = {
     noHighlights: "暂无高亮",
     delete: "删除",
     jumpTo: "跳转到",
+    addedBookmark: "书签已保存",
+    addedHighlight: "高亮已添加",
+    highlightFailed: "无法添加高亮",
+    bookmarkFailed: "无法添加书签",
+    removed: "标注已删除",
+    highlightColors: {
+      ylw: "琥珀高亮",
+      grn: "松柏高亮",
+      blu: "雾蓝高亮",
+      pnk: "烟粉高亮"
+    },
     drawer: {
       title: "书签",
       all: "全部",

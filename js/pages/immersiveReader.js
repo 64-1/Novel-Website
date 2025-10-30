@@ -1,9 +1,13 @@
-import { ReaderSettingsStore, LastReadStore } from "../services/Stores.js";
+import { ReaderSettingsStore, LastReadStore, AnnotationStore } from "../services/Stores.js";
 import ChaptersRepo from "../services/ChaptersRepo.js";
 import ThemeService from "../services/ThemeService.js";
 import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
+import { createAnnotations } from "../reader/Annotations.js";
 import Strings from "../strings.js";
+
+const HIGHLIGHT_COLORS = ["ylw", "grn", "blu", "pnk"];
+const HIGHLIGHT_COLOR_LABELS = Strings.annotations.highlightColors || {};
 
 document.addEventListener("DOMContentLoaded", () => {
   initImmersiveReader().catch((error) => {
@@ -28,6 +32,7 @@ async function initImmersiveReader() {
   const chromeElements = document.querySelectorAll("[data-layer='chrome']");
   const article = document.getElementById("immersiveArticle");
   const scrollContainer = document.getElementById("immersiveScroll");
+
   const topbarTitle = document.querySelector("[data-chapter-title]");
   const topbarIndex = document.querySelector("[data-chapter-index]");
   const topbarMeta = document.querySelector("[data-chapter-meta]");
@@ -39,9 +44,34 @@ async function initImmersiveReader() {
   const fontSlider = document.querySelector('[data-action="font-size"]');
   const fontDisplay = document.querySelector("[data-font-size-display]");
   const themeGroup = document.querySelector(".theme-group");
+
   const progressBar = document.querySelector('[data-progress="immersive"]');
   const progressFill = progressBar?.querySelector(".progress-fill");
   const progressLabel = document.querySelector("[data-progress-label]");
+
+  const annotationsButton = document.querySelector('[data-action="toggle-annotations"]');
+  const annotationBadge = document.querySelector("[data-annotation-count]");
+
+  const highlightPopover = document.getElementById("highlightPopover");
+  const highlightColorButtons = highlightPopover
+    ? highlightPopover.querySelectorAll("[data-color]")
+    : [];
+
+  const annotationDrawer = document.getElementById("annotationDrawer");
+  const annotationDrawerPanel = document.getElementById("annotationDrawerPanel");
+  const annotationBackdrop = annotationDrawer?.querySelector(".annotations-drawer__backdrop");
+  const annotationList = document.getElementById("annotationList");
+  const annotationTabs = annotationDrawer
+    ? annotationDrawer.querySelectorAll("[data-annotation-tab]")
+    : [];
+  const drawerAddBookmarkButton = annotationDrawer?.querySelector('[data-action="drawer-add-bookmark"]');
+  const drawerCountBadges = {
+    highlights: annotationDrawer?.querySelector('[data-count="highlights"]') || null,
+    bookmarks: annotationDrawer?.querySelector('[data-count="bookmarks"]') || null
+  };
+  const annotationDrawerTitle = document.getElementById("annotationDrawerTitle");
+
+  const toastEl = document.getElementById("immersiveToast");
 
   if (!stage || !article || !scrollContainer || !progressBar || !progressFill) {
     throw new Error("必需的阅读容器缺失");
@@ -70,6 +100,11 @@ async function initImmersiveReader() {
     modalTracker: null
   });
 
+  const annotationsController = createAnnotations({
+    articleEl: article,
+    store: AnnotationStore
+  });
+
   await ChaptersRepo.load();
   const chapters = ChaptersRepo.list();
   if (!Array.isArray(chapters) || !chapters.length) {
@@ -77,12 +112,17 @@ async function initImmersiveReader() {
   }
 
   let currentChapterIndex = resolveInitialIndex(chapters);
-
-  selectChapter(currentChapterIndex, { updateUrl: false });
-  setChromeVisible(false);
+  let currentChapterSlug = null;
+  let drawerOpen = false;
+  let highlightPopoverVisible = false;
+  let currentAnnotationsTab = "highlights";
+  let toastTimer = null;
+  let selectionHideTimer = null;
+  let annotationUnsubscribe = null;
 
   stage.addEventListener("click", (event) => {
     if (event.defaultPrevented) return;
+    if (drawerOpen || highlightPopoverVisible) return;
     if (event.target.closest("[data-chrome-surface]")) return;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed) return;
@@ -128,22 +168,173 @@ async function initImmersiveReader() {
   });
 
   shareButton?.addEventListener("click", () => {
+    if (!currentChapterSlug) return;
     const chapter = chapters[currentChapterIndex];
-    if (!chapter) return;
-    const shareUrl = buildShareUrl(chapter.slug);
+    const shareUrl = buildShareUrl(currentChapterSlug);
     const shareData = {
-      title: chapter.title,
-      text: Strings?.share?.description || "我正在星海小说阅读这篇章节，一起来看看吧！",
+      title: chapter?.title || Strings.meta.siteName,
+      text: Strings.meta.defaultDescription,
       url: shareUrl
     };
+
     if (navigator.share) {
-      navigator
-        .share(shareData)
-        .catch(() => {
-          copyToClipboard(shareUrl);
-        });
+      navigator.share(shareData).catch(() => {
+        copyToClipboard(shareUrl);
+        showToast("链接已复制");
+      });
     } else {
       copyToClipboard(shareUrl);
+      showToast("链接已复制");
+    }
+  });
+
+  annotationsButton?.addEventListener("click", () => {
+    if (drawerOpen) {
+      closeAnnotationsDrawer();
+    } else {
+      openAnnotationsDrawer();
+    }
+  });
+
+  drawerAddBookmarkButton?.addEventListener("click", () => {
+    handleBookmarkCreation({ fromDrawer: true });
+  });
+  if (highlightPopover && highlightColorButtons.length) {
+    highlightColorButtons.forEach((button) => {
+      const color = button.dataset.color;
+      if (color && HIGHLIGHT_COLORS.includes(color)) {
+        const label = HIGHLIGHT_COLOR_LABELS[color] || `${Strings.annotations.highlight}`;
+        button.setAttribute("aria-label", label);
+        button.addEventListener("click", () => {
+          handleHighlightCreation(color);
+        });
+      }
+    });
+  }
+
+  function handleSelectionPopover(event) {
+    if (!highlightPopover || !article) return;
+    clearTimeout(selectionHideTimer);
+
+    const selection = window.getSelection();
+    if (
+      !selection ||
+      selection.isCollapsed ||
+      selection.rangeCount === 0 ||
+      !article.contains(selection.anchorNode) ||
+      !article.contains(selection.focusNode)
+    ) {
+      hideHighlightPopover();
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!range || range.collapsed) {
+      hideHighlightPopover();
+      return;
+    }
+
+    showHighlightPopover(range);
+  }
+
+  scrollContainer.addEventListener("mouseup", handleSelectionPopover);
+  scrollContainer.addEventListener("touchend", handleSelectionPopover);
+
+  document.addEventListener("selectionchange", () => {
+    if (!highlightPopoverVisible) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      selectionHideTimer = window.setTimeout(() => {
+        hideHighlightPopover();
+      }, 80);
+    }
+  });
+
+  document.addEventListener("mousedown", (event) => {
+    if (!highlightPopoverVisible) return;
+    if (!highlightPopover.contains(event.target)) {
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+          hideHighlightPopover();
+        }
+      }, 20);
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (highlightPopoverVisible) {
+      hideHighlightPopover();
+    }
+  });
+
+  scrollContainer.addEventListener("scroll", () => {
+    if (highlightPopoverVisible) {
+      hideHighlightPopover();
+    }
+  });
+
+  annotationBackdrop?.addEventListener("click", () => closeAnnotationsDrawer());
+  annotationDrawer
+    ?.querySelectorAll("[data-action='close-annotations']")
+    .forEach((btn) => btn.addEventListener("click", () => closeAnnotationsDrawer()));
+
+  annotationTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const tabName = tab.dataset.annotationTab;
+      if (!tabName || currentAnnotationsTab === tabName) return;
+      currentAnnotationsTab = tabName;
+      annotationTabs.forEach((t) => t.classList.toggle("active", t === tab));
+      annotationTabs.forEach((t) =>
+        t.setAttribute("aria-selected", t.dataset.annotationTab === currentAnnotationsTab ? "true" : "false")
+      );
+      if (drawerOpen) {
+        renderAnnotationsDrawer();
+      }
+    });
+  });
+
+  annotationList?.addEventListener("click", (event) => {
+    const target = event.target;
+    const item = target.closest("[data-ann-id]");
+    if (!item) return;
+    const id = item.dataset.annId;
+    if (!id || !annotationsController) return;
+
+    if (target.closest("[data-action='delete']")) {
+      event.stopPropagation();
+      if (annotationsController.remove(id)) {
+        showToast(Strings.annotations.removed);
+        refreshAnnotationsUI();
+      }
+      return;
+    }
+
+    if (id.startsWith("bm_")) {
+      const jumped = annotationsController.jumpToBookmark(id, scrollContainer);
+      if (jumped) {
+        closeAnnotationsDrawer();
+      }
+    } else if (id.startsWith("hl_")) {
+      const jumped = annotationsController.jumpToHighlight(id);
+      if (jumped) {
+        closeAnnotationsDrawer();
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (drawerOpen) {
+        closeAnnotationsDrawer();
+        event.preventDefault();
+        return;
+      }
+      if (highlightPopoverVisible) {
+        hideHighlightPopover();
+        window.getSelection()?.removeAllRanges();
+        event.preventDefault();
+      }
     }
   });
 
@@ -156,18 +347,39 @@ async function initImmersiveReader() {
     }
   });
 
-  function selectChapter(index, options = {}) {
-    const { updateUrl = true, preserveChrome = false } = options;
+  annotationUnsubscribe = AnnotationStore.subscribe(() => {
+    refreshAnnotationsUI();
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (typeof annotationUnsubscribe === "function") {
+      annotationUnsubscribe();
+    }
+  });
+
+  const initialResult = selectChapter(currentChapterIndex, { updateUrl: false, preserveChrome: false });
+  if (!initialResult) {
+    throw new Error("无法渲染章节内容");
+  }
+  setChromeVisible(false, { force: true });
+
+  function selectChapter(index, { updateUrl = true, preserveChrome = false } = {}) {
     const safeIndex = Math.max(0, Math.min(index, chapters.length - 1));
     const chapter = readerView.render(safeIndex);
     if (!chapter) {
-      throw new Error(`无法渲染章节索引 ${safeIndex}`);
+      return false;
     }
 
     currentChapterIndex = safeIndex;
+    currentChapterSlug = chapter.slug;
+
+    if (!preserveChrome) {
+      setChromeVisible(false, { force: true });
+    }
+    hideHighlightPopover();
+
     const ordinal = safeIndex + 1;
     const stats = ChaptersRepo.getStats(chapter);
-
     if (topbarTitle) {
       topbarTitle.textContent = chapter.title || `章节 ${ordinal}`;
     }
@@ -180,16 +392,23 @@ async function initImmersiveReader() {
       topbarMeta.textContent = `≈ ${minutes} 分钟 · ${words} 字`;
     }
 
-    if (!preserveChrome) {
-      setChromeVisible(false);
-    }
-
+    annotationsController.applyForChapter(chapter.slug);
+    refreshAnnotationsUI();
     updateNavButtons();
     updateDocumentMeta(chapter);
     LastReadStore.set({ slug: chapter.slug });
 
     if (updateUrl) {
       pushUrlWithSlug(chapter.slug);
+    }
+
+    return true;
+  }
+
+  function refreshAnnotationsUI() {
+    const counts = updateAnnotationBadge(currentChapterSlug);
+    if (drawerOpen) {
+      renderAnnotationsDrawer(counts);
     }
   }
 
@@ -208,21 +427,289 @@ async function initImmersiveReader() {
     progressLabel.textContent = `${percent}%`;
   }
 
-  function setChromeVisible(visible) {
-    body.classList.toggle("chrome-open", visible);
-    chromeElements.forEach((element) => {
-      element.hidden = !visible;
+  function handleBookmarkCreation({ fromDrawer = false } = {}) {
+    if (!annotationsController || !currentChapterSlug) {
+      showToast(Strings.annotations.bookmarkFailed);
+      return;
+    }
+    const maxScroll = Math.max(scrollContainer.scrollHeight - scrollContainer.clientHeight, 1);
+    const percent = maxScroll > 0 ? scrollContainer.scrollTop / maxScroll : 0;
+    const bookmark = annotationsController.createBookmark({
+      slug: currentChapterSlug,
+      percent,
+      scrollTop: scrollContainer.scrollTop
     });
+    if (!bookmark) {
+      showToast(Strings.annotations.bookmarkFailed);
+      return;
+    }
+    const chapterNumber = currentChapterIndex + 1;
+    const percentLabel = Math.round(percent * 100);
+    refreshAnnotationsUI();
+    showToast(
+      Strings.annotations.fab?.bookmarkAdded
+        ? Strings.annotations.fab.bookmarkAdded(chapterNumber, percentLabel)
+        : Strings.annotations.addedBookmark
+    );
+  }
+
+  function handleHighlightCreation(color) {
+    if (!annotationsController || !currentChapterSlug) {
+      showToast(Strings.annotations.highlightFailed);
+      return;
+    }
+    const highlight = annotationsController.createHighlightFromSelection({
+      slug: currentChapterSlug,
+      color,
+      note: ""
+    });
+    if (!highlight) {
+      showToast(Strings.annotations.highlightFailed);
+      return;
+    }
+    annotationsController.applyForChapter(currentChapterSlug);
+    refreshAnnotationsUI();
+    hideHighlightPopover();
+    window.getSelection()?.removeAllRanges();
+    showToast(Strings.annotations.addedHighlight);
+  }
+
+  function showHighlightPopover(range) {
+    if (!highlightPopover) return;
+    const stageRect = stage.getBoundingClientRect();
+    const rect = range.getBoundingClientRect();
+    const top = rect.top - stageRect.top + scrollContainer.scrollTop;
+    const left = rect.left - stageRect.left + rect.width / 2 + scrollContainer.scrollLeft;
+    highlightPopover.style.top = `${top}px`;
+    highlightPopover.style.left = `${left}px`;
+    highlightPopover.classList.add("is-visible");
+    highlightPopover.setAttribute("aria-hidden", "false");
+    highlightPopoverVisible = true;
+    setChromeVisible(true, { force: true });
+  }
+
+  function hideHighlightPopover() {
+    if (!highlightPopover) return;
+    clearTimeout(selectionHideTimer);
+    selectionHideTimer = null;
+    if (!highlightPopoverVisible) return;
+    highlightPopover.classList.remove("is-visible");
+    highlightPopover.setAttribute("aria-hidden", "true");
+    highlightPopoverVisible = false;
+  }
+
+  function openAnnotationsDrawer() {
+    if (!annotationDrawer) return;
+    annotationDrawer.classList.add("is-open");
+    annotationDrawer.setAttribute("aria-hidden", "false");
+    annotationsButton?.setAttribute("aria-expanded", "true");
+    drawerOpen = true;
+    body.classList.add("drawer-open");
+    setChromeVisible(true, { force: true });
+    renderAnnotationsDrawer();
+    annotationDrawerPanel?.focus({ preventScroll: true });
+  }
+
+  function closeAnnotationsDrawer() {
+    if (!annotationDrawer) return;
+    annotationDrawer.classList.remove("is-open");
+    annotationDrawer.setAttribute("aria-hidden", "true");
+    annotationsButton?.setAttribute("aria-expanded", "false");
+    drawerOpen = false;
+    body.classList.remove("drawer-open");
+  }
+
+  function renderAnnotationsDrawer(countsFromCaller) {
+    if (!annotationList || !annotationsController || !currentChapterSlug) return;
+    const counts = countsFromCaller || updateAnnotationBadge(currentChapterSlug);
+    const bookmarkItems = counts.bookmarks;
+    const highlightItems = counts.highlights;
+
+    if (annotationDrawerTitle) {
+      const currentChapter = chapters[currentChapterIndex];
+      annotationDrawerTitle.textContent = currentChapter?.title || "标注";
+    }
+
+    annotationList.innerHTML = "";
+    annotationList.setAttribute("role", "list");
+
+    annotationTabs.forEach((tab) => {
+      const tabName = tab.dataset.annotationTab;
+      const isActive = tabName === currentAnnotationsTab;
+      tab.classList.toggle("active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    if (currentAnnotationsTab === "toc") {
+      renderTocList();
+      return;
+    }
+
+    const items = currentAnnotationsTab === "highlights" ? highlightItems : bookmarkItems;
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "annotations-empty";
+      empty.textContent =
+        currentAnnotationsTab === "highlights" ? Strings.annotations.noHighlights : Strings.annotations.noBookmarks;
+      annotationList.appendChild(empty);
+      return;
+    }
+
+    items.forEach((item) => {
+      const container = document.createElement("div");
+      container.className = "annotation-item";
+      container.dataset.annId = item.id;
+      container.setAttribute("role", "listitem");
+      container.setAttribute("tabindex", "0");
+
+      if (item.id.startsWith("hl_")) {
+        const createdAt = new Date(item.createdAt);
+        const timeStr = createdAt.toLocaleDateString("zh-CN", {
+          month: "short",
+          day: "numeric"
+        });
+        container.innerHTML = `
+          <div class="annotation-content">
+            <div class="annotation-snippet">高亮片段</div>
+            ${
+              item.note
+                ? `<div class="annotation-note">${escapeHtml(String(item.note))}</div>`
+                : ""
+            }
+            <div class="annotation-meta">${timeStr}</div>
+          </div>
+          <button class="annotation-delete" type="button" data-action="delete" aria-label="${Strings.annotations.delete}">×</button>
+        `;
+      } else {
+        const percent = Math.round((item.percent || 0) * 100);
+        const createdAt = new Date(item.createdAt);
+        const timeStr = createdAt.toLocaleDateString("zh-CN", {
+          month: "short",
+          day: "numeric"
+        });
+        container.innerHTML = `
+          <div class="annotation-content">
+            <div class="annotation-snippet">${percent}%</div>
+            ${
+              item.note
+                ? `<div class="annotation-note">${escapeHtml(String(item.note))}</div>`
+                : ""
+            }
+            <div class="annotation-meta">${timeStr}</div>
+          </div>
+          <button class="annotation-delete" type="button" data-action="delete" aria-label="${Strings.annotations.delete}">×</button>
+        `;
+      }
+
+      annotationList.appendChild(container);
+    });
+
+    if (currentAnnotationsTab === "highlights" && highlightItems.length) {
+      populateHighlightSnippets(highlightItems);
+    }
+  }
+
+  function renderTocList() {
+    if (!annotationList) return;
+    annotationList.innerHTML = "";
+    annotationList.setAttribute("role", "list");
+
+    chapters.forEach((chapter, index) => {
+      const button = document.createElement("button");
+      button.className = "annotation-item annotation-item--toc";
+      button.type = "button";
+      button.dataset.chapterIndex = String(index);
+      button.setAttribute("role", "listitem");
+      button.setAttribute("tabindex", "0");
+
+      if (index === currentChapterIndex) {
+        button.classList.add("is-active");
+        button.setAttribute("aria-current", "true");
+      }
+
+      button.innerHTML = `
+        <div class="annotation-content">
+          <div class="annotation-snippet">${escapeHtml(chapter.title || `第 ${index + 1} 章`)}</div>
+          <div class="annotation-meta">${index + 1} / ${chapters.length}</div>
+        </div>
+        <span class="annotation-toc-arrow">›</span>
+      `;
+
+      button.addEventListener("click", () => {
+        if (index === currentChapterIndex) {
+          closeAnnotationsDrawer();
+          return;
+        }
+        selectChapter(index, { updateUrl: true, preserveChrome: true });
+        closeAnnotationsDrawer();
+      });
+
+      annotationList.appendChild(button);
+    });
+  }
+
+  async function populateHighlightSnippets(highlights) {
+    if (!Array.isArray(highlights) || !highlights.length) return;
+    try {
+      const { buildTextMap } = await import("../reader/TextMap.js");
+      const textMap = buildTextMap(article);
+      highlights.forEach((item) => {
+        const range = textMap.offsetsToRange(item.start, item.end);
+        if (!range) return;
+        const snippet = range.toString().trim();
+        const target = annotationList?.querySelector(`[data-ann-id="${item.id}"] .annotation-snippet`);
+        if (target) {
+          const formatted = snippet.length > 60 ? `${snippet.slice(0, 60)}…` : snippet;
+          target.textContent = formatted || "高亮片段";
+        }
+      });
+    } catch (error) {
+      console.warn("[ImmersiveReader] 生成高亮摘要失败", error);
+    }
+  }
+
+  function updateAnnotationBadge(slug) {
+    if (!annotationsController || !slug) return { bookmarks: [], highlights: [] };
+    const { bookmarks, highlights } = annotationsController.list(slug);
+    const total = bookmarks.length + highlights.length;
+    if (annotationBadge) {
+      annotationBadge.textContent = String(total);
+      annotationBadge.hidden = total === 0;
+    }
+    if (drawerCountBadges.highlights) {
+      drawerCountBadges.highlights.textContent = highlights.length;
+    }
+    if (drawerCountBadges.bookmarks) {
+      drawerCountBadges.bookmarks.textContent = bookmarks.length;
+    }
+    return { bookmarks, highlights };
+  }
+
+  function showToast(message) {
+    if (!toastEl) return;
+    toastEl.textContent = message;
+    toastEl.setAttribute("aria-hidden", "false");
+    toastEl.classList.add("is-visible");
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toastEl.classList.remove("is-visible");
+      toastEl.setAttribute("aria-hidden", "true");
+    }, 2400);
   }
 
   function applyReaderSettings() {
     if (scrollContainer) {
       scrollContainer.style.fontSize = `${readerSettings.fontSize}px`;
-      const lineHeight = Number(readerSettings.lineHeight) || 1.7;
+      const lineHeight = Number(readerSettings.lineHeight) || 1.8;
       scrollContainer.style.lineHeight = lineHeight;
     }
     const theme = readerSettings.theme || "sepia";
     body.dataset.readerTheme = theme;
+  }
+
+  function persistReaderSettings() {
+    ReaderSettingsStore.save(readerSettings);
   }
 
   function updateThemeButtons() {
@@ -256,8 +743,14 @@ async function initImmersiveReader() {
     return { fontSize: 20, lineHeight: 1.8, theme: "sepia" };
   }
 
-  function persistReaderSettings() {
-    ReaderSettingsStore.save(readerSettings);
+  function setChromeVisible(visible, { force = false } = {}) {
+    if (!force && !visible && (drawerOpen || highlightPopoverVisible)) {
+      return;
+    }
+    body.classList.toggle("chrome-open", visible);
+    chromeElements.forEach((element) => {
+      element.hidden = !visible;
+    });
   }
 
   function resolveInitialIndex(chaptersList) {
@@ -289,6 +782,8 @@ async function initImmersiveReader() {
     url.pathname = "/read.html";
     if (slug) {
       url.searchParams.set("slug", slug);
+    } else {
+      url.searchParams.delete("slug");
     }
     history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
   }
@@ -350,7 +845,7 @@ async function initImmersiveReader() {
 
   function updateMeta(selector, content) {
     if (!content) return;
-    let element = document.querySelector(`meta[${selector}]`);
+    const element = document.querySelector(`meta[${selector}]`);
     if (!element) return;
     element.setAttribute("content", content);
   }
@@ -386,5 +881,11 @@ async function initImmersiveReader() {
       default:
         return "纸感";
     }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text || "";
+    return div.innerHTML;
   }
 }
