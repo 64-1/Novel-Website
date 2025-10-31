@@ -1,0 +1,253 @@
+/* FAB - Floating Action Button */
+.fab-add-bookmark {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 16px rgba(58, 112, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: transform var(--transition), opacity var(--transition),
+    box-shadow var(--transition), background var(--transition);
+  padding: 0;
+  /* Safe area support */
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  right: calc(24px + env(safe-area-inset-right));
+}
+
+.fab-add-bookmark:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(58, 112, 255, 0.5);
+}
+
+.fab-add-bookmark:active {
+  transform: scale(0.95);
+}
+
+.fab-add-bookmark[aria-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+body.dark-shell .fab-add-bookmark {
+  background: var(--primary);
+  box-shadow: 0 4px 16px rgba(141, 162, 255, 0.4);
+}
+
+body.dark-shell .fab-add-bookmark:hover {
+  box-shadow: 0 6px 20px rgba(141, 162, 255, 0.5);
+}
+
+.fab-icon {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 300;
+  display: block;
+}
+
+/* Adjust FAB position when modal progress bar is visible */
+body:has(.reader-modal[aria-hidden="false"]) .fab-add-bookmark,
+.reader-modal.active ~ .fab-add-bookmark {
+  bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+/* Hide FAB when keyboard is focused on mobile */
+@media (max-width: 720px) {
+  .fab-add-bookmark {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    right: calc(20px + env(safe-area-inset-right));
+    width: 52px;
+    height: 52px;
+  }
+
+  .fab-icon {
+    font-size: 24px;
+  }
+
+  /* Hide FAB when input is focused */
+  input:focus ~ * .fab-add-bookmark,
+  textarea:focus ~ * .fab-add-bookmark {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Bookmark Toast */
+.bookmark-toast {
+  position: fixed;
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: rgba(15, 23, 42, 0.92);
+  color: white;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3);
+  font-size: 14px;
+  z-index: 1001;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+  max-width: calc(100vw - 48px);
+  text-align: center;
+}
+
+body.dark-shell .bookmark-toast {
+  background: rgba(0, 0, 0, 0.9);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.bookmark-toast[aria-hidden="false"] {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+@media (max-width: 720px) {
+  .bookmark-toast {
+    bottom: calc(90px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 32px);
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+/* Service worker update toast */
+.update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(16px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  padding: 12px 18px;
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.32);
+  z-index: 1100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+  font-size: 14px;
+}
+
+.update-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.update-toast__message {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.update-toast__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.update-toast__action {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), opacity var(--transition);
+}
+
+.update-toast__action--primary {
+  background: #3a70ff;
+  color: #ffffff;
+}
+
+.update-toast__action--primary:hover,
+.update-toast__action--primary:focus-visible {
+  opacity: 0.88;
+}
+
+.update-toast__action--secondary {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.update-toast__action--secondary:hover,
+.update-toast__action--secondary:focus-visible {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+body.dark-shell .update-toast {
+  background: rgba(12, 17, 28, 0.94);
+  color: #f8fafc;
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.45);
+}
+
+body.dark-shell .update-toast__action--secondary {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+@media (max-width: 720px) {
+  .update-toast {
+    max-width: calc(100vw - 32px);
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .update-toast__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+.music-card .btn.secondary {
+  position: relative;
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(120deg, #4f46e5, #3b82f6);
+  color: #f8fafc;
+  border: none;
+  box-shadow: 0 18px 32px rgba(79, 70, 229, 0.22);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.music-card .btn.secondary .btn-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(248, 250, 255, 0.32);
+  display: grid;
+  place-items: center;
+}
+
+.music-card .btn.secondary .btn-icon::before {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 6px solid rgba(248, 250, 255, 0.9);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+.music-card .btn.secondary .btn-label {
+  position: relative;
+  z-index: 1;
+}

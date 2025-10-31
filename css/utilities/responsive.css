@@ -1,0 +1,17 @@
+/**
+ * Responsive Utilities
+ * Global responsive helpers and breakpoints
+ */
+
+/*
+ * Note: Component-specific media queries are kept with their respective components.
+ * This file is reserved for global responsive utilities if needed in the future.
+ */
+
+/* Common breakpoints used throughout the site:
+ * - 1080px: Large tablets and small desktops
+ * - 960px: Tablets landscape
+ * - 720px: Tablets portrait and large phones
+ * - 680px: Small tablets and large phones
+ * - 480px: Mobile phones
+ */

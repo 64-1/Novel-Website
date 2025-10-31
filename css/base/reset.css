@@ -1,0 +1,37 @@
+/**
+ * Reset & Normalization
+ * Basic resets and element defaults
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-gradient);
+  color: var(--text-body);
+  line-height: 1.6;
+  min-height: 100vh;
+  background-attachment: fixed;
+}
+
+/* Performance optimization - content-visibility */
+section.hero,
+.discover,
+.reader-lab,
+.writer-studio,
+.community {
+  content-visibility: auto;
+  contain-intrinsic-size: 600px;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
