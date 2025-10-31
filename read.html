@@ -53,6 +53,17 @@
         <button class="highlight-swatch highlight-swatch--blu" type="button" data-color="blu" aria-label="雾蓝高亮"></button>
         <button class="highlight-swatch highlight-swatch--pnk" type="button" data-color="pnk" aria-label="烟粉高亮"></button>
       </div>
+      <div class="codex-popover" id="codexPopover" role="dialog" aria-hidden="true">
+        <div class="codex-popover__inner">
+          <button class="codex-popover__close" type="button" data-action="close-codex" aria-label="关闭世界观卡片">×</button>
+          <span class="codex-popover__badge" data-codex-tag></span>
+          <h3 class="codex-popover__title" data-codex-title></h3>
+          <p class="codex-popover__summary" data-codex-summary></p>
+          <ul class="codex-popover__details" data-codex-details></ul>
+          <ul class="codex-popover__timeline" data-codex-timeline></ul>
+          <div class="codex-popover__tags" data-codex-tags></div>
+        </div>
+      </div>
     </section>
 
     <footer class="immersive-toolbar" data-layer="chrome" data-chrome-surface hidden>
@@ -114,6 +125,10 @@
         <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="bookmarks">
           书签
           <span class="drawer-tab__count" data-count="bookmarks">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="codex">
+          世界观
+          <span class="drawer-tab__count" data-count="codex">0</span>
         </button>
         <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="toc">
           目录

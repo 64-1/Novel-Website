@@ -2,7 +2,8 @@ import {
   ReaderSettingsStore,
   DraftStore,
   ProgressStore,
-  LastReadStore
+  LastReadStore,
+  CodexStore
 } from "./services/Stores.js";
 import ChaptersRepo from "./services/ChaptersRepo.js";
 import ThemeService from "./services/ThemeService.js";
@@ -24,7 +25,8 @@ const stores = {
   ReaderSettingsStore,
   DraftStore,
   ProgressStore,
-  LastReadStore
+  LastReadStore,
+  CodexStore
 };
 
 const router = {

@@ -1,5 +1,6 @@
 import { ReaderSettingsStore, LastReadStore, AnnotationStore } from "../services/Stores.js";
 import ChaptersRepo from "../services/ChaptersRepo.js";
+import UniverseCodex from "../services/UniverseCodex.js";
 import ThemeService from "../services/ThemeService.js";
 import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
@@ -58,6 +59,15 @@ async function initImmersiveReader() {
     ? highlightPopover.querySelectorAll("[data-color]")
     : [];
 
+  const codexPopover = document.getElementById("codexPopover");
+  const codexPopoverTag = codexPopover?.querySelector("[data-codex-tag]");
+  const codexPopoverTitle = codexPopover?.querySelector("[data-codex-title]");
+  const codexPopoverSummary = codexPopover?.querySelector("[data-codex-summary]");
+  const codexPopoverDetails = codexPopover?.querySelector("[data-codex-details]");
+  const codexPopoverTimeline = codexPopover?.querySelector("[data-codex-timeline]");
+  const codexPopoverTags = codexPopover?.querySelector("[data-codex-tags]");
+  const codexPopoverClose = codexPopover?.querySelector('[data-action="close-codex"]');
+
   const annotationDrawer = document.getElementById("annotationDrawer");
   const annotationDrawerPanel = document.getElementById("annotationDrawerPanel");
   const annotationBackdrop = annotationDrawer?.querySelector(".annotations-drawer__backdrop");
@@ -68,7 +78,8 @@ async function initImmersiveReader() {
   const drawerAddBookmarkButton = annotationDrawer?.querySelector('[data-action="drawer-add-bookmark"]');
   const drawerCountBadges = {
     highlights: annotationDrawer?.querySelector('[data-count="highlights"]') || null,
-    bookmarks: annotationDrawer?.querySelector('[data-count="bookmarks"]') || null
+    bookmarks: annotationDrawer?.querySelector('[data-count="bookmarks"]') || null,
+    codex: annotationDrawer?.querySelector('[data-count="codex"]') || null
   };
   const annotationDrawerTitle = document.getElementById("annotationDrawerTitle");
 
@@ -106,6 +117,7 @@ async function initImmersiveReader() {
     store: AnnotationStore
   });
 
+  await UniverseCodex.load();
   await ChaptersRepo.load();
   const chapters = ChaptersRepo.list();
   if (!Array.isArray(chapters) || !chapters.length) {
@@ -116,14 +128,21 @@ async function initImmersiveReader() {
   let currentChapterSlug = null;
   let drawerOpen = false;
   let highlightPopoverVisible = false;
+  let codexPopoverVisible = false;
   let currentAnnotationsTab = "highlights";
   let toastTimer = null;
   let selectionHideTimer = null;
   let annotationUnsubscribe = null;
+  let codexUnsubscribe = null;
+  let activeCodexTrigger = null;
+  let codexMentionElements = new Set();
+  let currentCodexEntries = [];
+  let codexEntryMap = new Map();
+  let codexTermMatchers = [];
 
   stage.addEventListener("click", (event) => {
     if (event.defaultPrevented) return;
-    if (drawerOpen || highlightPopoverVisible) return;
+    if (drawerOpen || highlightPopoverVisible || codexPopoverVisible) return;
     if (event.target.closest("[data-chrome-surface]")) return;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed) return;
@@ -213,6 +232,10 @@ async function initImmersiveReader() {
     });
   }
 
+  codexPopoverClose?.addEventListener("click", () => {
+    closeCodexPopover({ restoreFocus: true });
+  });
+
   function handleSelectionPopover(event) {
     if (!highlightPopover || !article) return;
     clearTimeout(selectionHideTimer);
@@ -252,8 +275,7 @@ async function initImmersiveReader() {
   });
 
   document.addEventListener("mousedown", (event) => {
-    if (!highlightPopoverVisible) return;
-    if (!highlightPopover.contains(event.target)) {
+    if (highlightPopoverVisible && highlightPopover && !highlightPopover.contains(event.target)) {
       setTimeout(() => {
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed) {
@@ -261,17 +283,31 @@ async function initImmersiveReader() {
         }
       }, 20);
     }
+    if (
+      codexPopoverVisible &&
+      codexPopover &&
+      !codexPopover.contains(event.target) &&
+      !event.target.closest("[data-codex-mention]")
+    ) {
+      closeCodexPopover({ restoreFocus: false });
+    }
   });
 
   window.addEventListener("resize", () => {
     if (highlightPopoverVisible) {
       hideHighlightPopover();
     }
+    if (codexPopoverVisible) {
+      closeCodexPopover({ restoreFocus: false });
+    }
   });
 
   scrollContainer.addEventListener("scroll", () => {
     if (highlightPopoverVisible) {
       hideHighlightPopover();
+    }
+    if (codexPopoverVisible) {
+      closeCodexPopover({ restoreFocus: false });
     }
   });
 
@@ -327,12 +363,27 @@ async function initImmersiveReader() {
     }
   });
 
+  annotationList?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action='codex-jump']");
+    if (!button) return;
+    const codexId = button.dataset.codexId;
+    if (!codexId) return;
+    event.preventDefault();
+    closeAnnotationsDrawer();
+    jumpToCodexMention(codexId);
+  });
+
   let lastBookmarkKeyTime = 0;
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       if (drawerOpen) {
         closeAnnotationsDrawer();
+        event.preventDefault();
+        return;
+      }
+      if (codexPopoverVisible) {
+        closeCodexPopover({ restoreFocus: true });
         event.preventDefault();
         return;
       }
@@ -369,9 +420,17 @@ async function initImmersiveReader() {
     refreshAnnotationsUI();
   });
 
+  codexUnsubscribe = UniverseCodex.subscribe(() => {
+    if (!currentChapterSlug) return;
+    refreshCodexEntries();
+  });
+
   window.addEventListener("beforeunload", () => {
     if (typeof annotationUnsubscribe === "function") {
       annotationUnsubscribe();
+    }
+    if (typeof codexUnsubscribe === "function") {
+      codexUnsubscribe();
     }
   });
 
@@ -411,6 +470,7 @@ async function initImmersiveReader() {
     }
 
     annotationsController.applyForChapter(chapter.slug);
+    refreshCodexEntries({ refreshUI: false });
     refreshAnnotationsUI();
     updateNavButtons();
     updateDocumentMeta(chapter);
@@ -428,6 +488,463 @@ async function initImmersiveReader() {
     if (drawerOpen) {
       renderAnnotationsDrawer(counts);
     }
+  }
+
+  function refreshCodexEntries({ refreshUI = true } = {}) {
+    clearCodexMentions();
+    closeCodexPopover();
+    currentCodexEntries = currentChapterSlug ? UniverseCodex.getEntriesForSlug(currentChapterSlug) : [];
+    codexEntryMap = new Map(currentCodexEntries.map((entry) => [entry.id, entry]));
+    codexTermMatchers = buildCodexTermMatchers(currentCodexEntries);
+    applyCodexMentions();
+    if (refreshUI) {
+      refreshAnnotationsUI();
+    } else {
+      updateAnnotationBadge(currentChapterSlug);
+    }
+  }
+
+  function buildCodexTermMatchers(entries) {
+    if (!Array.isArray(entries) || !entries.length) {
+      return [];
+    }
+    const matchers = [];
+    const seen = new Set();
+    entries.forEach((entry) => {
+      if (!Array.isArray(entry.terms)) return;
+      entry.terms.forEach((term) => {
+        const safeTerm = typeof term === "string" ? term.trim() : "";
+        if (!safeTerm) return;
+        const key = `${entry.id}::${safeTerm}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const lower = safeTerm.toLowerCase();
+        matchers.push({
+          term: safeTerm,
+          termLower: lower,
+          entryId: entry.id,
+          length: safeTerm.length,
+          requiresBoundary: /[a-zA-Z]/.test(safeTerm)
+        });
+      });
+    });
+    matchers.sort((a, b) => b.length - a.length || a.term.localeCompare(b.term, "zh-Hans"));
+    return matchers;
+  }
+
+  function clearCodexMentions() {
+    codexMentionElements.forEach((element) => {
+      const textContent = element.textContent || "";
+      if (element.parentNode) {
+        const textNode = document.createTextNode(textContent);
+        element.parentNode.replaceChild(textNode, element);
+      }
+    });
+    codexMentionElements.clear();
+  }
+
+  function applyCodexMentions() {
+    if (!article || !codexTermMatchers.length) {
+      return;
+    }
+
+    const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node || typeof node.nodeValue !== "string") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (!node.nodeValue.trim()) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        const parent = node.parentElement;
+        if (!parent) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (parent.closest("[data-codex-mention]")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (parent.closest("button, a, mark.hl, code, pre, textarea")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    textNodes.forEach((textNode) => {
+      const text = textNode.nodeValue;
+      const matches = findCodexMatchesInText(text);
+      if (!matches.length) {
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      let cursor = 0;
+      matches.forEach((match) => {
+        if (match.start > cursor) {
+          fragment.appendChild(document.createTextNode(text.slice(cursor, match.start)));
+        }
+        const entry = codexEntryMap.get(match.entryId);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "codex-term";
+        button.dataset.codexId = match.entryId;
+        button.dataset.codexTerm = match.term;
+        button.setAttribute("data-codex-mention", "true");
+        button.setAttribute("aria-haspopup", "dialog");
+        button.textContent = match.term;
+        if (entry) {
+          const typeLabel = UniverseCodex.getTypeLabel(entry.type);
+          button.setAttribute("aria-label", `${entry.name} · ${typeLabel}`);
+        }
+        button.addEventListener("click", handleCodexTermClick);
+        button.addEventListener("keydown", handleCodexTermKeydown);
+        codexMentionElements.add(button);
+        fragment.appendChild(button);
+        cursor = match.end;
+      });
+      if (cursor < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      }
+      textNode.parentNode?.replaceChild(fragment, textNode);
+    });
+  }
+
+  function findCodexMatchesInText(text) {
+    if (!text || !codexTermMatchers.length) {
+      return [];
+    }
+    const matches = [];
+    const lowerText = text.toLowerCase();
+
+    codexTermMatchers.forEach((matcher) => {
+      let fromIndex = 0;
+      while (fromIndex <= lowerText.length) {
+        const index = lowerText.indexOf(matcher.termLower, fromIndex);
+        if (index === -1) break;
+        const end = index + matcher.length;
+
+        const overlaps = matches.some((existing) => index < existing.end && end > existing.start);
+        if (overlaps) {
+          fromIndex = end;
+          continue;
+        }
+
+        if (matcher.requiresBoundary) {
+          const prevChar = lowerText[index - 1];
+          const nextChar = lowerText[end];
+          if ((prevChar && /\w/.test(prevChar)) || (nextChar && /\w/.test(nextChar))) {
+            fromIndex = end;
+            continue;
+          }
+        }
+
+        matches.push({
+          start: index,
+          end,
+          term: text.slice(index, end),
+          entryId: matcher.entryId
+        });
+        fromIndex = end;
+      }
+    });
+
+    matches.sort((a, b) => a.start - b.start);
+    return matches;
+  }
+
+  function handleCodexTermClick(event) {
+    const target = event.currentTarget;
+    if (!target || typeof target !== "object") return;
+    const codexId = target.dataset.codexId;
+    if (!codexId) return;
+    event.preventDefault();
+    if (codexPopoverVisible && codexPopover?.dataset.codexId === codexId) {
+      closeCodexPopover({ restoreFocus: false });
+      return;
+    }
+    openCodexPopover(codexId, target);
+  }
+
+  function handleCodexTermKeydown(event) {
+    if (!event) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleCodexTermClick(event);
+    }
+  }
+
+  function openCodexPopover(entryId, trigger) {
+    if (!codexPopover) return;
+    const entry = codexEntryMap.get(entryId);
+    if (!entry) return;
+
+    if (activeCodexTrigger && activeCodexTrigger !== trigger) {
+      activeCodexTrigger.classList.remove("is-active");
+    }
+
+    populateCodexPopover(entry);
+    codexPopover.dataset.codexId = entryId;
+    codexPopover.classList.add("is-visible");
+    codexPopover.setAttribute("aria-hidden", "false");
+    codexPopoverVisible = true;
+    activeCodexTrigger = trigger || null;
+    if (activeCodexTrigger) {
+      activeCodexTrigger.classList.add("is-active");
+    }
+
+    const stageRect = stage.getBoundingClientRect();
+    const triggerRect = trigger ? trigger.getBoundingClientRect() : null;
+    const popoverWidth = codexPopover.offsetWidth || 320;
+    const stageWidth = stageRect.width;
+    let top = 0;
+    let left = 0;
+
+    if (triggerRect) {
+      top = triggerRect.top - stageRect.top + scrollContainer.scrollTop - codexPopover.offsetHeight - 16;
+      left = triggerRect.left - stageRect.left + triggerRect.width / 2 - popoverWidth / 2;
+    } else {
+      top = scrollContainer.scrollTop + 32;
+      left = (stageWidth - popoverWidth) / 2;
+    }
+
+    const maxTop = scrollContainer.scrollHeight - codexPopover.offsetHeight - 24;
+    top = Math.max(16, Math.min(top, maxTop));
+    left = Math.max(16, Math.min(left, stageWidth - popoverWidth - 16));
+
+    codexPopover.style.top = `${top}px`;
+    codexPopover.style.left = `${left}px`;
+
+    setChromeVisible(true, { force: true });
+  }
+
+  function populateCodexPopover(entry) {
+    if (!codexPopover) return;
+    if (codexPopoverTag) {
+      codexPopoverTag.textContent = UniverseCodex.getTypeLabel(entry.type);
+      codexPopoverTag.hidden = !codexPopoverTag.textContent;
+    }
+    if (codexPopoverTitle) {
+      codexPopoverTitle.textContent = entry.name || "";
+    }
+    if (codexPopoverSummary) {
+      codexPopoverSummary.textContent = entry.summary || "";
+      codexPopoverSummary.hidden = !entry.summary;
+    }
+
+    if (codexPopoverDetails) {
+      codexPopoverDetails.innerHTML = "";
+      if (Array.isArray(entry.details) && entry.details.length) {
+        entry.details.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "codex-popover__detail";
+          if (item.label) {
+            const label = document.createElement("strong");
+            label.textContent = item.label;
+            li.appendChild(label);
+          }
+          if (item.value) {
+            const span = document.createElement("span");
+            span.textContent = item.value;
+            li.appendChild(span);
+          }
+          codexPopoverDetails.appendChild(li);
+        });
+        codexPopoverDetails.hidden = false;
+      } else {
+        codexPopoverDetails.hidden = true;
+      }
+    }
+
+    if (codexPopoverTimeline) {
+      codexPopoverTimeline.innerHTML = "";
+      if (Array.isArray(entry.timeline) && entry.timeline.length) {
+        entry.timeline.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "codex-popover__timeline-item";
+          if (item.label) {
+            const label = document.createElement("span");
+            label.className = "codex-popover__timeline-label";
+            label.textContent = item.label;
+            li.appendChild(label);
+          }
+          if (item.value) {
+            const desc = document.createElement("p");
+            desc.textContent = item.value;
+            li.appendChild(desc);
+          }
+          codexPopoverTimeline.appendChild(li);
+        });
+        codexPopoverTimeline.hidden = false;
+      } else {
+        codexPopoverTimeline.hidden = true;
+      }
+    }
+
+    if (codexPopoverTags) {
+      codexPopoverTags.innerHTML = "";
+      if (Array.isArray(entry.tags) && entry.tags.length) {
+        entry.tags.forEach((tag) => {
+          const chip = document.createElement("span");
+          chip.className = "codex-popover__tag";
+          chip.textContent = tag;
+          codexPopoverTags.appendChild(chip);
+        });
+        codexPopoverTags.hidden = false;
+      } else {
+        codexPopoverTags.hidden = true;
+      }
+    }
+  }
+
+  function closeCodexPopover({ restoreFocus = false } = {}) {
+    if (!codexPopoverVisible || !codexPopover) return;
+    codexPopover.classList.remove("is-visible");
+    codexPopover.setAttribute("aria-hidden", "true");
+    codexPopover.style.top = "";
+    codexPopover.style.left = "";
+    codexPopoverVisible = false;
+    const trigger = activeCodexTrigger;
+    activeCodexTrigger = null;
+    trigger?.classList.remove("is-active");
+    if (restoreFocus && trigger && typeof trigger.focus === "function") {
+      trigger.focus({ preventScroll: true });
+    }
+  }
+
+  function renderCodexList() {
+    if (!annotationList) return;
+    annotationList.innerHTML = "";
+    annotationList.setAttribute("role", "list");
+
+    if (!currentCodexEntries.length) {
+      const empty = document.createElement("div");
+      empty.className = "annotations-empty annotations-empty--codex";
+      empty.textContent = Strings?.codex?.empty || "本章暂未收录世界观条目";
+      annotationList.appendChild(empty);
+      return;
+    }
+
+    const typeOrder = ["character", "location", "concept", "timeline", "artifact"];
+    const sorted = currentCodexEntries.slice().sort((a, b) => {
+      const typeRankA = typeOrder.indexOf(a.type) === -1 ? typeOrder.length : typeOrder.indexOf(a.type);
+      const typeRankB = typeOrder.indexOf(b.type) === -1 ? typeOrder.length : typeOrder.indexOf(b.type);
+      if (typeRankA !== typeRankB) {
+        return typeRankA - typeRankB;
+      }
+      return a.name.localeCompare(b.name, "zh-Hans");
+    });
+
+    sorted.forEach((entry) => {
+      const card = document.createElement("article");
+      card.className = "codex-card";
+      card.dataset.codexId = entry.id;
+      card.setAttribute("role", "listitem");
+
+      const header = document.createElement("header");
+      header.className = "codex-card__header";
+      const badge = document.createElement("span");
+      badge.className = "codex-card__badge";
+      badge.textContent = UniverseCodex.getTypeLabel(entry.type);
+      header.appendChild(badge);
+
+      const title = document.createElement("h3");
+      title.className = "codex-card__title";
+      title.textContent = entry.name;
+      header.appendChild(title);
+
+      if (entry.origin === "user") {
+        const origin = document.createElement("span");
+        origin.className = "codex-card__origin";
+        origin.textContent = Strings?.codex?.origin?.user || "本地草稿";
+        header.appendChild(origin);
+      }
+
+      card.appendChild(header);
+
+      if (entry.summary) {
+        const summary = document.createElement("p");
+        summary.className = "codex-card__summary";
+        summary.textContent = entry.summary;
+        card.appendChild(summary);
+      }
+
+      if (Array.isArray(entry.details) && entry.details.length) {
+        const detailList = document.createElement("dl");
+        detailList.className = "codex-card__details";
+        entry.details.forEach((detail) => {
+          const dt = document.createElement("dt");
+          dt.textContent = detail.label;
+          const dd = document.createElement("dd");
+          dd.textContent = detail.value;
+          detailList.appendChild(dt);
+          detailList.appendChild(dd);
+        });
+        card.appendChild(detailList);
+      }
+
+      if (Array.isArray(entry.timeline) && entry.timeline.length) {
+        const timeline = document.createElement("ul");
+        timeline.className = "codex-card__timeline";
+        entry.timeline.forEach((event) => {
+          const li = document.createElement("li");
+          const label = document.createElement("span");
+          label.className = "codex-card__timeline-label";
+          label.textContent = event.label;
+          const value = document.createElement("p");
+          value.textContent = event.value;
+          li.appendChild(label);
+          li.appendChild(value);
+          timeline.appendChild(li);
+        });
+        card.appendChild(timeline);
+      }
+
+      if (Array.isArray(entry.tags) && entry.tags.length) {
+        const tags = document.createElement("div");
+        tags.className = "codex-card__tags";
+        entry.tags.forEach((tag) => {
+          const chip = document.createElement("span");
+          chip.textContent = tag;
+          tags.appendChild(chip);
+        });
+        card.appendChild(tags);
+      }
+
+      const footer = document.createElement("footer");
+      footer.className = "codex-card__footer";
+      const locateButton = document.createElement("button");
+      locateButton.type = "button";
+      locateButton.dataset.action = "codex-jump";
+      locateButton.dataset.codexId = entry.id;
+      locateButton.className = "codex-card__jump";
+      locateButton.textContent = Strings?.codex?.jump || "定位正文";
+      footer.appendChild(locateButton);
+      card.appendChild(footer);
+
+      annotationList.appendChild(card);
+    });
+  }
+
+  function jumpToCodexMention(entryId) {
+    if (!entryId || !article) {
+      return false;
+    }
+    const mention = article.querySelector(`[data-codex-id="${entryId}"]`);
+    if (!mention) {
+      showToast(Strings?.codex?.noMention || "该条目在正文中暂未出现。");
+      return false;
+    }
+    mention.classList.add("is-focused");
+    mention.scrollIntoView({ behavior: "smooth", block: "center" });
+    openCodexPopover(entryId, mention);
+    setTimeout(() => {
+      mention.classList.remove("is-focused");
+    }, 2200);
+    return true;
   }
 
   function updateNavButtons() {
@@ -518,6 +1035,7 @@ async function initImmersiveReader() {
 
   function openAnnotationsDrawer() {
     if (!annotationDrawer) return;
+    closeCodexPopover({ restoreFocus: false });
     annotationDrawer.classList.add("is-open");
     annotationDrawer.setAttribute("aria-hidden", "false");
     annotationsButton?.setAttribute("aria-expanded", "true");
@@ -544,8 +1062,12 @@ async function initImmersiveReader() {
     const highlightItems = counts.highlights;
 
     if (annotationDrawerTitle) {
-      const currentChapter = chapters[currentChapterIndex];
-      annotationDrawerTitle.textContent = currentChapter?.title || "标注";
+      if (currentAnnotationsTab === "codex") {
+        annotationDrawerTitle.textContent = Strings?.codex?.drawerTitle || "世界观手册";
+      } else {
+        const currentChapter = chapters[currentChapterIndex];
+        annotationDrawerTitle.textContent = currentChapter?.title || "标注";
+      }
     }
 
     annotationList.innerHTML = "";
@@ -560,6 +1082,11 @@ async function initImmersiveReader() {
 
     if (currentAnnotationsTab === "toc") {
       renderTocList();
+      return;
+    }
+
+    if (currentAnnotationsTab === "codex") {
+      renderCodexList();
       return;
     }
 
@@ -688,7 +1215,9 @@ async function initImmersiveReader() {
   }
 
   function updateAnnotationBadge(slug) {
-    if (!annotationsController || !slug) return { bookmarks: [], highlights: [] };
+    if (!annotationsController || !slug) {
+      return { bookmarks: [], highlights: [], codex: currentCodexEntries };
+    }
     const { bookmarks, highlights } = annotationsController.list(slug);
     const total = bookmarks.length + highlights.length;
     if (annotationBadge) {
@@ -701,7 +1230,10 @@ async function initImmersiveReader() {
     if (drawerCountBadges.bookmarks) {
       drawerCountBadges.bookmarks.textContent = bookmarks.length;
     }
-    return { bookmarks, highlights };
+    if (drawerCountBadges.codex) {
+      drawerCountBadges.codex.textContent = currentCodexEntries.length;
+    }
+    return { bookmarks, highlights, codex: currentCodexEntries };
   }
 
   function showToast(message) {
@@ -762,7 +1294,7 @@ async function initImmersiveReader() {
   }
 
   function setChromeVisible(visible, { force = false } = {}) {
-    if (!force && !visible && (drawerOpen || highlightPopoverVisible)) {
+    if (!force && !visible && (drawerOpen || highlightPopoverVisible || codexPopoverVisible)) {
       return;
     }
     body.classList.toggle("chrome-open", visible);

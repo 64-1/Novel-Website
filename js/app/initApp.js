@@ -14,9 +14,12 @@ export function initApp({
   if (!stores) {
     throw new Error("initApp requires stores dependency");
   }
-  const { ReaderSettingsStore, DraftStore, LastReadStore } = stores;
+  const { ReaderSettingsStore, DraftStore, LastReadStore, CodexStore } = stores;
   if (!ReaderSettingsStore || !DraftStore) {
     throw new Error("stores missing ReaderSettingsStore or DraftStore");
+  }
+  if (!CodexStore) {
+    throw new Error("stores missing CodexStore");
   }
   if (!chaptersRepo) {
     throw new Error("initApp requires chaptersRepo");
@@ -47,6 +50,14 @@ export function initApp({
   }
 
   const Strings = strings || {};
+
+  const CODEX_TYPE_LABELS = {
+    character: "角色",
+    location: "地点",
+    concept: "设定",
+    timeline: "时间线",
+    artifact: "器物"
+  };
 
   document.addEventListener("DOMContentLoaded", () => {
     const body = document.body;
@@ -91,6 +102,20 @@ export function initApp({
     const playMusicButtonLabel = playMusicButton?.querySelector(".btn-label");
     const volumeSlider = document.getElementById("music-volume");
     const volumeValue = document.getElementById("volume-value");
+    const codexSidebar = document.getElementById("codexSidebar");
+    const codexSidebarList = document.getElementById("codexSidebarList");
+    const codexEntryCount = document.getElementById("codexEntryCount");
+    const codexToggleButton = document.getElementById("codexToggleButton");
+    const codexForm = document.getElementById("codexForm");
+    const codexTypeField = document.getElementById("codexType");
+    const codexNameField = document.getElementById("codexName");
+    const codexSummaryField = document.getElementById("codexSummary");
+    const codexTagsField = document.getElementById("codexTags");
+    const codexTermsField = document.getElementById("codexTerms");
+    const codexChaptersField = document.getElementById("codexChapters");
+    const codexDetailsField = document.getElementById("codexDetails");
+    const codexTimelineField = document.getElementById("codexTimeline");
+    const codexFormHint = document.getElementById("codexFormHint");
 
     if (musicSelect) {
       enhanceMusicSelect(musicSelect);
@@ -110,6 +135,8 @@ export function initApp({
     let chapters = [];
     let preparedNextSlug = null;
     let preparedPrevSlug = null;
+    let codexEntries = [];
+    let codexStoreUnsubscribe = null;
 
     const readerSettings = loadReaderSettings();
     applyReaderSettings();
@@ -220,6 +247,7 @@ export function initApp({
     updateWordCount();
     updatePreview();
     initChapters();
+    initCodexSidebar();
 
     themeToggleBtn?.addEventListener("click", () => {
       themeService.toggleShellMode();
@@ -388,6 +416,259 @@ export function initApp({
           volumeValue.textContent = `${volume}%`;
         }
       });
+    }
+
+    function initCodexSidebar() {
+      if (!codexSidebarList || !CodexStore) {
+        return;
+      }
+
+      codexEntries = CodexStore.loadAll() || [];
+      renderCodexSidebar(codexEntries);
+
+      codexStoreUnsubscribe = CodexStore.subscribe(() => {
+        codexEntries = CodexStore.loadAll() || [];
+        renderCodexSidebar(codexEntries);
+      });
+
+      codexSidebarList.addEventListener("click", (event) => {
+        const deleteButton = event.target.closest('[data-action="delete-codex-entry"]');
+        if (!deleteButton) return;
+        const item = deleteButton.closest("[data-codex-id]");
+        const entryId = item?.dataset.codexId;
+        if (!entryId) return;
+        event.preventDefault();
+        const removed = CodexStore.remove(entryId);
+        if (removed) {
+          showToast((Strings?.codex?.removed) || "条目已删除。阅读端将同步更新。");
+        } else {
+          showToast("删除失败，请稍后再试。");
+        }
+      });
+
+      codexForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        handleCodexFormSubmit();
+      });
+
+      const cancelCodexButton = codexForm?.querySelector('[data-action="cancel-codex-entry"]');
+      cancelCodexButton?.addEventListener("click", () => {
+        closeCodexForm({ focusToggle: true });
+      });
+
+      codexToggleButton?.addEventListener("click", () => {
+        toggleCodexForm();
+      });
+
+      window.addEventListener("beforeunload", () => {
+        if (typeof codexStoreUnsubscribe === "function") {
+          codexStoreUnsubscribe();
+        }
+      });
+    }
+
+    function renderCodexSidebar(entries) {
+      if (!codexSidebarList) return;
+      codexSidebarList.innerHTML = "";
+
+      const total = Array.isArray(entries) ? entries.length : 0;
+      if (codexEntryCount) {
+        codexEntryCount.textContent = `${total} 条`;
+      }
+
+      if (!total) {
+        return;
+      }
+
+      const sorted = entries
+        .slice()
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      const visible = sorted.slice(0, 4);
+
+      visible.forEach((entry) => {
+        const item = document.createElement("li");
+        item.className = "codex-sidebar-item";
+        item.dataset.codexId = entry.id;
+
+        const meta = document.createElement("div");
+        meta.className = "codex-sidebar-item__meta";
+
+        const nameNode = document.createElement("strong");
+        nameNode.textContent = entry.name;
+        meta.appendChild(nameNode);
+
+        const typeNode = document.createElement("span");
+        typeNode.className = "codex-sidebar-item__type";
+        typeNode.textContent = CODEX_TYPE_LABELS[entry.type] || CODEX_TYPE_LABELS.concept;
+        meta.appendChild(typeNode);
+
+        if (entry.summary) {
+          const summaryNode = document.createElement("p");
+          summaryNode.className = "codex-sidebar-item__summary";
+          summaryNode.textContent = entry.summary;
+          summaryNode.title = entry.summary;
+          meta.appendChild(summaryNode);
+        }
+
+        if (Array.isArray(entry.tags) && entry.tags.length) {
+          const tagsNode = document.createElement("div");
+          tagsNode.className = "codex-sidebar-tags";
+          entry.tags.slice(0, 4).forEach((tag) => {
+            const chip = document.createElement("span");
+            chip.textContent = tag;
+            tagsNode.appendChild(chip);
+          });
+          meta.appendChild(tagsNode);
+        }
+
+        item.appendChild(meta);
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "codex-sidebar-item__delete";
+        deleteButton.dataset.action = "delete-codex-entry";
+        deleteButton.setAttribute("aria-label", `删除 ${entry.name}`);
+        deleteButton.textContent = "×";
+        item.appendChild(deleteButton);
+
+        codexSidebarList.appendChild(item);
+      });
+
+      if (sorted.length > visible.length) {
+        const moreItem = document.createElement("li");
+        moreItem.className = "codex-sidebar-item codex-sidebar-item--more";
+        moreItem.textContent = `还有 ${sorted.length - visible.length} 条条目，继续在写作中拓展吧。`;
+        codexSidebarList.appendChild(moreItem);
+      }
+    }
+
+    function toggleCodexForm() {
+      if (!codexForm) return;
+      const isHidden = codexForm.hasAttribute("hidden");
+      if (isHidden) {
+        openCodexForm();
+      } else {
+        closeCodexForm({ focusToggle: false });
+      }
+    }
+
+    function openCodexForm() {
+      if (!codexForm) return;
+      codexForm.removeAttribute("hidden");
+      if (codexToggleButton) {
+        codexToggleButton.textContent = "收起表单";
+      }
+      showCodexHint("");
+      codexNameField?.focus();
+    }
+
+    function closeCodexForm({ focusToggle = false } = {}) {
+      if (!codexForm) return;
+      codexForm.reset();
+      codexForm.setAttribute("hidden", "");
+      showCodexHint("");
+      if (codexToggleButton) {
+        codexToggleButton.textContent = "新增条目";
+      }
+      if (focusToggle) {
+        codexToggleButton?.focus();
+      }
+    }
+
+    function handleCodexFormSubmit() {
+      const name = (codexNameField?.value || "").trim();
+      if (!name) {
+        showCodexHint("请填写条目名称。", "error");
+        codexNameField?.focus();
+        return;
+      }
+
+      const type = (codexTypeField?.value || "concept").trim() || "concept";
+      const summary = (codexSummaryField?.value || "").trim();
+      const tags = parseCommaSeparated(codexTagsField?.value);
+      const terms = parseCommaSeparated(codexTermsField?.value);
+      const chapters = parseCommaSeparated(codexChaptersField?.value);
+      const details = parseKeyValueLines(codexDetailsField?.value);
+      const timeline = parseKeyValueLines(codexTimelineField?.value);
+
+      if (!terms.length) {
+        terms.push(name);
+      }
+
+      const entry = {
+        id: generateCodexId(type, name),
+        type,
+        name,
+        summary,
+        tags,
+        terms,
+        chapters,
+        details,
+        timeline
+      };
+
+      const saved = CodexStore.add(entry);
+      if (!saved) {
+        showCodexHint("保存失败，请稍后再试。", "error");
+        return;
+      }
+
+      showToast((Strings?.codex?.saved) || "条目已保存，可在阅读端查看。");
+      closeCodexForm({ focusToggle: true });
+    }
+
+    function parseCommaSeparated(value = "") {
+      return String(value)
+        .split(/[，,]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function parseKeyValueLines(value = "") {
+      return String(value)
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const separatorMatch = line.match(/[:：]/);
+          if (!separatorMatch) {
+            return { label: "", value: line };
+          }
+          const separatorIndex = separatorMatch.index ?? line.indexOf(separatorMatch[0]);
+          const label = line.slice(0, separatorIndex).trim();
+          const content = line.slice(separatorIndex + 1).trim();
+          return { label, value: content };
+        })
+        .filter((item) => item.label || item.value);
+    }
+
+    function slugify(value) {
+      return String(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    function generateCodexId(type, name) {
+      const base = slugify(name);
+      if (base) {
+        return `user-${type}-${base}`;
+      }
+      return `user-${type}-${Date.now()}`;
+    }
+
+    function showCodexHint(message, tone = "info") {
+      if (!codexFormHint) return;
+      codexFormHint.textContent = message;
+      codexFormHint.classList.remove("is-error", "is-success");
+      if (!message) {
+        return;
+      }
+      if (tone === "error") {
+        codexFormHint.classList.add("is-error");
+      } else if (tone === "success") {
+        codexFormHint.classList.add("is-success");
+      }
     }
 
     function enhanceMusicSelect(nativeSelect) {

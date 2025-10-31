@@ -1,4 +1,4 @@
-const SW_VERSION = "v11";
+const SW_VERSION = "v12";
 const CACHE_NAME = `xinghai-static-${SW_VERSION}`;
 const ASSETS = [
   "./",
@@ -34,6 +34,7 @@ const ASSETS = [
   "./js/services/ThemeService.js",
   "./js/services/AudioPlayer.js",
   "./js/services/Shortcuts.js",
+  "./js/services/UniverseCodex.js",
   "./js/reader/ProgressTracker.js",
   "./js/reader/ReaderView.js",
   "./js/reader/TocList.js",
@@ -44,6 +45,7 @@ const ASSETS = [
   "./js/strings.js",
   "./chapters.json",
   "./data/books.json",
+  "./data/universe.json",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
