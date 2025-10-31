@@ -1,0 +1,57 @@
+/**
+ * CSS Variables - Theme Tokens
+ * Light and dark theme CSS custom properties
+ */
+
+:root {
+  color-scheme: light;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --bg-base: #f5f7fb;
+  --bg-gradient: linear-gradient(160deg, #f8fbff 0%, #eef2ff 40%, #ffffff 100%);
+  --surface: #ffffff;
+  --surface-alt: rgba(255, 255, 255, 0.8);
+  --surface-soft: rgba(248, 250, 255, 0.85);
+  --surface-strong: rgba(255, 255, 255, 0.92);
+  --surface-stronger: rgba(255, 255, 255, 0.96);
+  --surface-blur: rgba(248, 250, 255, 0.88);
+  --surface-muted: rgba(15, 23, 42, 0.06);
+  --primary: #3a70ff;
+  --primary-soft: rgba(58, 112, 255, 0.12);
+  --primary-accent: rgba(58, 112, 255, 0.18);
+  --text-strong: #121926;
+  --text-body: #334155;
+  --text-muted: #64748b;
+  --border: rgba(148, 163, 184, 0.25);
+  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.08);
+  --radius-lg: 26px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 220ms ease;
+  --search-hit-bg: #ffe58f;
+  --search-hit-current: #fff2ab;
+  --search-hit-outline: #3a70ff;
+}
+
+body.dark-shell {
+  color-scheme: dark;
+  --bg-base: #0b1120;
+  --bg-gradient: linear-gradient(160deg, #0b1220 0%, #0f172a 45%, #111827 100%);
+  --surface: rgba(15, 23, 42, 0.85);
+  --surface-alt: rgba(30, 41, 59, 0.7);
+  --surface-soft: rgba(30, 41, 59, 0.78);
+  --surface-strong: rgba(15, 23, 42, 0.92);
+  --surface-stronger: rgba(14, 20, 35, 0.95);
+  --surface-blur: rgba(11, 15, 28, 0.82);
+  --surface-muted: rgba(51, 65, 85, 0.35);
+  --primary: #8da2ff;
+  --primary-soft: rgba(141, 162, 255, 0.2);
+  --primary-accent: rgba(99, 102, 241, 0.26);
+  --text-strong: #f8fafc;
+  --text-body: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border: rgba(51, 65, 85, 0.7);
+  --shadow-soft: 0 18px 40px rgba(2, 6, 23, 0.65);
+  --search-hit-bg: rgba(250, 204, 21, 0.35);
+  --search-hit-current: rgba(250, 204, 21, 0.55);
+  --search-hit-outline: #facc15;
+}
