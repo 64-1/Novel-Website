@@ -104,7 +104,9 @@ export function initApp({
     const volumeValue = document.getElementById("volume-value");
     const codexSidebar = document.getElementById("codexSidebar");
     const codexSidebarList = document.getElementById("codexSidebarList");
+    const codexSidebarBody = document.getElementById("codexSidebarBody");
     const codexEntryCount = document.getElementById("codexEntryCount");
+    const codexCollapseButton = document.getElementById("codexCollapseButton");
     const codexToggleButton = document.getElementById("codexToggleButton");
     const codexForm = document.getElementById("codexForm");
     const codexTypeField = document.getElementById("codexType");
@@ -419,7 +421,7 @@ export function initApp({
     }
 
     function initCodexSidebar() {
-      if (!codexSidebarList || !CodexStore) {
+      if (!codexSidebar || !codexSidebarList || !CodexStore) {
         return;
       }
 
@@ -429,6 +431,11 @@ export function initApp({
       codexStoreUnsubscribe = CodexStore.subscribe(() => {
         codexEntries = CodexStore.loadAll() || [];
         renderCodexSidebar(codexEntries);
+      });
+
+      codexCollapseButton?.addEventListener("click", () => {
+        const collapsed = codexSidebar.classList.contains("is-collapsed");
+        setCodexCollapsed(!collapsed);
       });
 
       codexSidebarList.addEventListener("click", (event) => {
@@ -457,6 +464,9 @@ export function initApp({
       });
 
       codexToggleButton?.addEventListener("click", () => {
+        if (codexSidebar?.classList.contains("is-collapsed")) {
+          setCodexCollapsed(false);
+        }
         toggleCodexForm();
       });
 
@@ -465,6 +475,28 @@ export function initApp({
           codexStoreUnsubscribe();
         }
       });
+
+      const initiallyCollapsed = codexSidebar.classList.contains("is-collapsed");
+      setCodexCollapsed(initiallyCollapsed);
+    }
+
+    function setCodexCollapsed(collapsed) {
+      if (!codexSidebar) return;
+      codexSidebar.classList.toggle("is-collapsed", collapsed);
+      if (codexSidebarBody) {
+        if (collapsed) {
+          codexSidebarBody.setAttribute("hidden", "");
+        } else {
+          codexSidebarBody.removeAttribute("hidden");
+        }
+      }
+      if (codexCollapseButton) {
+        codexCollapseButton.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        codexCollapseButton.textContent = collapsed ? "展开" : "收起";
+      }
+      if (collapsed) {
+        closeCodexForm({ focusToggle: false, collapseTriggered: true });
+      }
     }
 
     function renderCodexSidebar(entries) {
@@ -554,6 +586,7 @@ export function initApp({
 
     function openCodexForm() {
       if (!codexForm) return;
+      setCodexCollapsed(false);
       codexForm.removeAttribute("hidden");
       if (codexToggleButton) {
         codexToggleButton.textContent = "收起表单";
@@ -562,15 +595,17 @@ export function initApp({
       codexNameField?.focus();
     }
 
-    function closeCodexForm({ focusToggle = false } = {}) {
+    function closeCodexForm({ focusToggle = false, collapseTriggered = false } = {}) {
       if (!codexForm) return;
-      codexForm.reset();
+      if (!collapseTriggered) {
+        codexForm.reset();
+      }
       codexForm.setAttribute("hidden", "");
       showCodexHint("");
       if (codexToggleButton) {
         codexToggleButton.textContent = "新增条目";
       }
-      if (focusToggle) {
+      if (focusToggle && !collapseTriggered) {
         codexToggleButton?.focus();
       }
     }
