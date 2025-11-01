@@ -10,6 +10,17 @@ import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
 const HIGHLIGHT_COLORS = ["ylw", "grn", "blu", "pnk"];
 const HIGHLIGHT_COLOR_LABELS = Strings.annotations.highlightColors || {};
+const THEME_LABELS = {
+  sepia: "纸感",
+  day: "晨光",
+  night: "夜间",
+  mint: "雾绿",
+  ink: "墨青"
+};
+const FONT_STACKS = {
+  serif: '"Noto Serif SC", "STZhongsong", serif',
+  sans: '"Inter", "PingFang SC", "Source Han Sans", sans-serif'
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   initImmersiveReader().catch((error) => {
@@ -84,6 +95,20 @@ async function initImmersiveReader() {
   const annotationDrawerTitle = document.getElementById("annotationDrawerTitle");
 
   const toastEl = document.getElementById("immersiveToast");
+  const quickbar = document.querySelector(".reader-quickbar");
+  const settingsQuickButton = quickbar?.querySelector(".quick-item[data-quick='settings']");
+  const settingsDrawer = document.getElementById("readerSettings");
+  const settingsPanel = document.getElementById("readerSettingsPanel");
+  const settingsBackdrop = settingsDrawer?.querySelector(".reader-settings__backdrop");
+  const settingsCloseButtons = settingsDrawer?.querySelectorAll('[data-action="close-settings"]');
+  const settingsFontSlider = document.getElementById("settingsFontSize");
+  const settingsFontValue = document.querySelector("[data-settings-font-display]");
+  const settingsFontMinus = settingsDrawer?.querySelector('[data-action="font-smaller"]');
+  const settingsFontPlus = settingsDrawer?.querySelector('[data-action="font-larger"]');
+  const lineHeightButtons = settingsDrawer?.querySelectorAll("[data-line-height]");
+  const swatchButtons = settingsDrawer?.querySelectorAll(".swatch");
+  const fontButtons = settingsDrawer?.querySelectorAll(".settings-fonts .pill-btn");
+  let lastSettingsTrigger = null;
 
   if (!stage || !article || !scrollContainer || !progressBar || !progressFill) {
     throw new Error("必需的阅读容器缺失");
@@ -93,9 +118,11 @@ async function initImmersiveReader() {
   ThemeService.applyStoredShellMode();
 
   const readerSettings = loadReaderSettings();
+  let lastNonNightTheme = readerSettings.theme === "night" ? "sepia" : readerSettings.theme || "sepia";
   applyReaderSettings();
   updateThemeButtons();
   updateFontDisplay();
+  updateQuickThemeLabel();
 
   const tracker = createTracker({
     container: scrollContainer,
@@ -153,17 +180,23 @@ async function initImmersiveReader() {
     button.addEventListener("click", () => {
       const theme = button.dataset.readerTheme || "sepia";
       if (readerSettings.theme === theme) return;
-      readerSettings.theme = theme;
-      applyReaderSettings();
-      persistReaderSettings();
+      if (theme !== "night") {
+        lastNonNightTheme = theme;
+      }
+      ThemeService.handleReaderThemeSelection(theme, {
+        readerSettings,
+        applyReaderSettings,
+        persistReaderSettings
+      });
       updateThemeButtons();
+      updateQuickThemeLabel();
     });
   });
 
   fontSlider?.addEventListener("input", (event) => {
     const value = Number(event.target.value);
     if (!Number.isFinite(value)) return;
-    readerSettings.fontSize = Math.min(Math.max(value, 16), 26);
+    readerSettings.fontSize = Math.min(Math.max(value, 16), 28);
     applyReaderSettings();
     persistReaderSettings();
     updateFontDisplay();
@@ -374,9 +407,20 @@ async function initImmersiveReader() {
   });
 
   let lastBookmarkKeyTime = 0;
+  let lastTapTime = 0;
+  let touchTapTimer = 0;
 
   document.addEventListener("keydown", (event) => {
+    const activeTag = document.activeElement?.tagName;
+    const isTypingContext =
+      activeTag && ["INPUT", "TEXTAREA"].includes(activeTag) && !document.activeElement?.readOnly;
+
     if (event.key === "Escape") {
+      if (isSettingsOpen()) {
+        closeSettingsDrawer();
+        event.preventDefault();
+        return;
+      }
       if (drawerOpen) {
         closeAnnotationsDrawer();
         event.preventDefault();
@@ -395,6 +439,22 @@ async function initImmersiveReader() {
       return;
     }
 
+    if (!isTypingContext && event.key === "ArrowLeft") {
+      if (prevButton && !prevButton.disabled) {
+        prevButton.click();
+        event.preventDefault();
+        return;
+      }
+    }
+
+    if (!isTypingContext && event.key === "ArrowRight") {
+      if (nextButton && !nextButton.disabled) {
+        nextButton.click();
+        event.preventDefault();
+        return;
+      }
+    }
+
     if (event.key.toLowerCase() === "b" && !event.metaKey && !event.ctrlKey && !event.altKey) {
       const now = Date.now();
       if (now - lastBookmarkKeyTime <= 400) {
@@ -405,6 +465,199 @@ async function initImmersiveReader() {
         lastBookmarkKeyTime = now;
       }
     }
+  });
+
+  scrollContainer.addEventListener("dblclick", (event) => {
+    if (event.defaultPrevented) return;
+    if (event.target.closest("button, a, input, textarea, select, [data-codex-mention]")) {
+      return;
+    }
+    if (window.getSelection) {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        return;
+      }
+    }
+    handleBookmarkCreation();
+  });
+
+  scrollContainer.addEventListener("pointerup", (event) => {
+    if (event.pointerType !== "pen") {
+      return;
+    }
+    if (event.target.closest("button, a, input, textarea, select, [data-codex-mention]")) {
+      return;
+    }
+    if (window.getSelection && !window.getSelection().isCollapsed) {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTapTime <= 320) {
+      handleBookmarkCreation();
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+    }
+  });
+
+  scrollContainer.addEventListener(
+    "touchend",
+    (event) => {
+      if (event.defaultPrevented) return;
+      if (event.touches && event.touches.length > 0) {
+        return;
+      }
+      const target = event.target;
+      if (target && target.closest("button, a, input, textarea, select, [data-codex-mention]")) {
+        return;
+      }
+      if (typeof window.getSelection === "function") {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed && selection.toString().trim()) {
+          return;
+        }
+      }
+      window.clearTimeout(touchTapTimer);
+      if (touchTapTimer) {
+        handleBookmarkCreation();
+        touchTapTimer = 0;
+      } else {
+        touchTapTimer = window.setTimeout(() => {
+          touchTapTimer = 0;
+        }, 320);
+      }
+    },
+    { passive: true }
+  );
+
+  quickbar?.addEventListener("click", (event) => {
+    const button = event.target.closest(".quick-item");
+    if (!button) return;
+    const action = button.dataset.quick;
+    if (!action) return;
+    if (action === "toc") {
+      // Let existing toggle handler manage drawer
+      return;
+    }
+    event.preventDefault();
+    switch (action) {
+      case "font": {
+        lastSettingsTrigger = button;
+        toggleSettingsDrawer(true);
+        const sliderWrap = settingsPanel?.querySelector(".settings-slider");
+        sliderWrap?.classList.add("is-highlight");
+        settingsFontSlider?.focus({ preventScroll: true });
+        window.setTimeout(() => {
+          sliderWrap?.classList.remove("is-highlight");
+        }, 1400);
+        button.classList.add("is-active");
+        window.setTimeout(() => button.classList.remove("is-active"), 600);
+        break;
+      }
+      case "theme": {
+        const nextTheme = readerSettings.theme === "night" ? lastNonNightTheme || "sepia" : "night";
+        if (nextTheme !== "night") {
+          lastNonNightTheme = nextTheme;
+        } else if (readerSettings.theme !== "night") {
+          lastNonNightTheme = readerSettings.theme || "sepia";
+        }
+        const targetButton = Array.from(themeButtons).find(
+          (btn) => btn.dataset.readerTheme === nextTheme
+        );
+        if (targetButton) {
+          targetButton.click();
+        } else {
+          ThemeService.handleReaderThemeSelection(nextTheme, {
+            readerSettings,
+            applyReaderSettings,
+            persistReaderSettings
+          });
+          updateThemeButtons();
+        }
+        updateQuickThemeLabel();
+        const label = THEME_LABELS[nextTheme] || THEME_LABELS.sepia;
+        showToast(nextTheme === "night" ? "夜间模式已开启" : `切换至${label}`);
+        button.classList.add("is-active");
+        window.setTimeout(() => button.classList.remove("is-active"), 600);
+        break;
+      }
+      case "settings": {
+        const targetState = !isSettingsOpen();
+        lastSettingsTrigger = button;
+        if (targetState) {
+          toggleSettingsDrawer(true);
+        } else {
+          closeSettingsDrawer();
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  settingsBackdrop?.addEventListener("click", closeSettingsDrawer);
+  settingsCloseButtons?.forEach((btn) => btn.addEventListener("click", closeSettingsDrawer));
+
+  settingsFontSlider?.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    readerSettings.fontSize = Math.min(Math.max(value, 16), 28);
+    applyReaderSettings();
+    persistReaderSettings();
+    updateFontDisplay();
+    updateSettingsFontControls();
+  });
+
+  settingsFontMinus?.addEventListener("click", () => {
+    if (!settingsFontSlider) return;
+    const value = Math.max(Number(settingsFontSlider.value) - 1, Number(settingsFontSlider.min) || 16);
+    settingsFontSlider.value = String(value);
+    settingsFontSlider.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  settingsFontPlus?.addEventListener("click", () => {
+    if (!settingsFontSlider) return;
+    const value = Math.min(Number(settingsFontSlider.value) + 1, Number(settingsFontSlider.max) || 28);
+    settingsFontSlider.value = String(value);
+    settingsFontSlider.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  lineHeightButtons?.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      lineHeightButtons.forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+      const value = Number(btn.dataset.lineHeight) || 1.8;
+      readerSettings.lineHeight = value;
+      applyReaderSettings();
+      persistReaderSettings();
+    });
+  });
+
+  swatchButtons?.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const theme = btn.dataset.theme;
+      if (!theme) return;
+      if (theme !== "night") {
+        lastNonNightTheme = theme;
+      }
+      ThemeService.handleReaderThemeSelection(theme, {
+        readerSettings,
+        applyReaderSettings,
+        persistReaderSettings
+      });
+      updateThemeButtons();
+      updateQuickThemeLabel();
+      swatchButtons.forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+    });
+  });
+
+  fontButtons?.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const selected = btn.dataset.font === "sans" ? "sans" : "serif";
+      if (readerSettings.font === selected) return;
+      readerSettings.font = selected;
+      applyReaderSettings();
+      persistReaderSettings();
+    });
   });
 
   window.addEventListener("popstate", () => {
@@ -1039,6 +1292,7 @@ async function initImmersiveReader() {
     annotationDrawer.classList.add("is-open");
     annotationDrawer.setAttribute("aria-hidden", "false");
     annotationsButton?.setAttribute("aria-expanded", "true");
+    annotationsButton?.classList.add("is-active");
     drawerOpen = true;
     body.classList.add("drawer-open");
     setChromeVisible(true, { force: true });
@@ -1051,6 +1305,7 @@ async function initImmersiveReader() {
     annotationDrawer.classList.remove("is-open");
     annotationDrawer.setAttribute("aria-hidden", "true");
     annotationsButton?.setAttribute("aria-expanded", "false");
+    annotationsButton?.classList.remove("is-active");
     drawerOpen = false;
     body.classList.remove("drawer-open");
   }
@@ -1248,18 +1503,83 @@ async function initImmersiveReader() {
     }, 2400);
   }
 
+  function updateFontSliderVisual(value) {
+    const sliders = [];
+    if (fontSlider) sliders.push(fontSlider);
+    if (settingsFontSlider && !sliders.includes(settingsFontSlider)) sliders.push(settingsFontSlider);
+    if (!sliders.length) return;
+    const min = Number(fontSlider?.min) || Number(settingsFontSlider?.min) || 16;
+    const max = Number(fontSlider?.max) || Number(settingsFontSlider?.max) || 28;
+    const clamped = Math.min(Math.max(Number(value) || min, min), max);
+    const percent = ((clamped - min) / (max - min || 1)) * 100;
+    const theme = body.dataset.readerTheme || readerSettings.theme || "sepia";
+    let startColor = "rgba(124,58,237,0.6)";
+    let midColor = "rgba(236,196,121,0.6)";
+    let endColor = "rgba(226,232,240,0.35)";
+    if (theme === "night") {
+      startColor = "rgba(59,130,246,0.6)";
+      midColor = "rgba(147,197,253,0.6)";
+      endColor = "rgba(30,41,59,0.55)";
+    } else if (theme === "day") {
+      startColor = "rgba(96,165,250,0.5)";
+      midColor = "rgba(165,180,252,0.55)";
+      endColor = "rgba(226,232,240,0.45)";
+    } else if (theme === "sepia") {
+      startColor = "rgba(186,142,96,0.55)";
+      midColor = "rgba(224,180,110,0.6)";
+      endColor = "rgba(224,200,166,0.4)";
+    } else if (theme === "mint") {
+      startColor = "rgba(94,180,142,0.5)";
+      midColor = "rgba(178,230,201,0.6)";
+      endColor = "rgba(210,236,223,0.4)";
+    } else if (theme === "ink") {
+      startColor = "rgba(56,189,248,0.55)";
+      midColor = "rgba(125,211,252,0.55)";
+      endColor = "rgba(22,32,48,0.6)";
+    }
+    const gradient = `linear-gradient(90deg, ${startColor} 0%, ${midColor} ${percent}%, ${endColor} ${percent}%, ${endColor} 100%)`;
+    sliders.forEach((slider) => {
+      slider.style.background = gradient;
+    });
+  }
+
+  function updateQuickThemeLabel() {
+    const quickThemeButton = document.querySelector(".quick-item[data-quick='theme']");
+    if (!quickThemeButton) return;
+    const label = quickThemeButton.querySelector(".quick-item__label");
+    if (!label) return;
+    const theme = readerSettings.theme || "sepia";
+    const labelText = THEME_LABELS[theme] || THEME_LABELS.sepia;
+    const isDark = theme === "night" || theme === "ink";
+    quickThemeButton.classList.toggle("is-day", !isDark);
+    label.textContent = labelText;
+  }
+
   function applyReaderSettings() {
     if (scrollContainer) {
       scrollContainer.style.fontSize = `${readerSettings.fontSize}px`;
       const lineHeight = Number(readerSettings.lineHeight) || 1.8;
       scrollContainer.style.lineHeight = lineHeight;
     }
+    const selectedFont = readerSettings.font === "sans" ? "sans" : "serif";
+    readerSettings.font = selectedFont;
+    if (article) {
+      article.style.fontFamily = FONT_STACKS[selectedFont] || FONT_STACKS.serif;
+    }
     const theme = readerSettings.theme || "sepia";
     body.dataset.readerTheme = theme;
+    updateFontSliderVisual(readerSettings.fontSize);
+    updateQuickThemeLabel();
+    updateSettingsFontControls();
   }
 
   function persistReaderSettings() {
-    ReaderSettingsStore.save(readerSettings);
+    ReaderSettingsStore.save({
+      fontSize: Math.min(Math.max(Number(readerSettings.fontSize) || 20, 16), 28),
+      lineHeight: Number(readerSettings.lineHeight) || 1.8,
+      theme: readerSettings.theme || "sepia",
+      font: readerSettings.font === "sans" ? "sans" : "serif"
+    });
   }
 
   function updateThemeButtons() {
@@ -1278,19 +1598,84 @@ async function initImmersiveReader() {
     }
     if (fontSlider) {
       fontSlider.value = String(Math.round(readerSettings.fontSize));
+      updateFontSliderVisual(readerSettings.fontSize);
     }
+  }
+
+  function isSettingsOpen() {
+    return settingsDrawer?.getAttribute("aria-hidden") === "false";
+  }
+
+  function toggleSettingsDrawer(forceOpen) {
+    if (!settingsDrawer || !settingsPanel) return;
+    const shouldOpen = forceOpen ?? settingsDrawer.getAttribute("aria-hidden") !== "false";
+    settingsDrawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+    settingsQuickButton?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    settingsQuickButton?.classList.toggle("is-active", shouldOpen);
+    if (shouldOpen) {
+      if (!lastSettingsTrigger) {
+        lastSettingsTrigger = settingsQuickButton;
+      }
+      settingsPanel.focus({ preventScroll: true });
+      updateSettingsFontControls();
+      swatchButtons?.forEach((btn) => {
+        btn.setAttribute("aria-pressed", btn.dataset.theme === readerSettings.theme ? "true" : "false");
+      });
+      lineHeightButtons?.forEach((btn) => {
+        btn.setAttribute(
+          "aria-pressed",
+          Number(btn.dataset.lineHeight) === Number(readerSettings.lineHeight) ? "true" : "false"
+        );
+      });
+      const usingSans = readerSettings.font === "sans";
+      fontButtons?.forEach((btn) => {
+        const isSans = btn.dataset.font === "sans";
+        btn.setAttribute("aria-pressed", isSans === usingSans ? "true" : "false");
+      });
+    }
+  }
+
+  function closeSettingsDrawer() {
+    toggleSettingsDrawer(false);
+    if (lastSettingsTrigger) {
+      lastSettingsTrigger.focus({ preventScroll: true });
+      lastSettingsTrigger = null;
+    }
+  }
+
+  function updateSettingsFontControls() {
+    if (!settingsFontValue || !settingsFontSlider) return;
+    const value = Math.round(readerSettings.fontSize);
+    settingsFontValue.textContent = `${value}px`;
+    settingsFontSlider.value = String(value);
+    updateFontSliderVisual(value);
+    lineHeightButtons?.forEach((btn) => {
+      btn.setAttribute(
+        "aria-pressed",
+        Number(btn.dataset.lineHeight) === Number(readerSettings.lineHeight) ? "true" : "false"
+      );
+    });
+    swatchButtons?.forEach((btn) => {
+      btn.setAttribute("aria-pressed", btn.dataset.theme === readerSettings.theme ? "true" : "false");
+    });
+    const usingSans = readerSettings.font === "sans";
+    fontButtons?.forEach((btn) => {
+      const isSans = btn.dataset.font === "sans";
+      btn.setAttribute("aria-pressed", isSans === usingSans ? "true" : "false");
+    });
   }
 
   function loadReaderSettings() {
     const stored = ReaderSettingsStore.load();
     if (stored && typeof stored === "object") {
       return {
-        fontSize: Number(stored.fontSize) || 20,
+        fontSize: Math.min(Math.max(Number(stored.fontSize) || 20, 16), 28),
         lineHeight: Number(stored.lineHeight) || 1.8,
-        theme: stored.theme || "sepia"
+        theme: stored.theme || "sepia",
+        font: stored.font === "sans" ? "sans" : "serif"
       };
     }
-    return { fontSize: 20, lineHeight: 1.8, theme: "sepia" };
+    return { fontSize: 20, lineHeight: 1.8, theme: "sepia", font: "serif" };
   }
 
   function setChromeVisible(visible, { force = false } = {}) {
@@ -1422,15 +1807,7 @@ async function initImmersiveReader() {
   }
 
   function themeLabel(theme) {
-    switch (theme) {
-      case "night":
-        return "夜间";
-      case "day":
-        return "晨光";
-      case "sepia":
-      default:
-        return "纸感";
-    }
+    return THEME_LABELS[theme] || THEME_LABELS.sepia;
   }
 
 }

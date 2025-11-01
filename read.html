@@ -68,31 +68,45 @@
 
     <footer class="immersive-toolbar" data-layer="chrome" data-chrome-surface hidden>
       <div class="toolbar-row toolbar-row--nav">
-        <button class="toolbar-btn" type="button" data-action="prev-chapter">上一章</button>
-        <div class="progress-group">
+        <button class="nav-pill nav-pill--prev" type="button" data-action="prev-chapter" title="上一章（快捷键 ←）">
+          <span class="nav-pill__icon" aria-hidden="true"></span>
+          <span class="nav-pill__text">上一章</span>
+          <span class="nav-pill__hint" aria-hidden="true">←</span>
+        </button>
+        <div class="progress-cluster">
           <div class="immersive-progress" data-progress="immersive" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="阅读进度">
             <span class="progress-track"></span>
             <span class="progress-fill"></span>
           </div>
-          <span class="progress-label" data-progress-label>0%</span>
+          <div class="progress-meta">
+            <span class="progress-label" data-progress-label>0%</span>
+            <span class="progress-hint">小提示：使用 ← → 快速换章 · 双击正文就能加书签</span>
+          </div>
         </div>
-        <button class="toolbar-btn" type="button" data-action="next-chapter">下一章</button>
+        <button class="nav-pill nav-pill--next" type="button" data-action="next-chapter" title="下一章（快捷键 →）">
+          <span class="nav-pill__text">下一章</span>
+          <span class="nav-pill__hint" aria-hidden="true">→</span>
+          <span class="nav-pill__icon" aria-hidden="true"></span>
+        </button>
       </div>
-      <div class="toolbar-row toolbar-row--settings">
-        <div class="slider-group">
-          <label for="fontSizeControl">字号</label>
-          <input id="fontSizeControl" type="range" min="17" max="24" value="20" step="1" data-action="font-size">
-          <span class="slider-value" data-font-size-display>20px</span>
-        </div>
-        <button class="toolbar-btn toolbar-btn--ghost toolbar-btn--wide" type="button" data-action="toggle-annotations" aria-expanded="false" aria-controls="annotationDrawerPanel">
-          <span>书签 · 标注 · 目录</span>
+      <div class="reader-quickbar" role="group" aria-label="快速操作">
+        <button class="quick-item" type="button" data-quick="toc" data-action="toggle-annotations" aria-controls="annotationDrawerPanel" aria-expanded="false">
+          <span class="quick-item__icon quick-item__icon--toc" aria-hidden="true"></span>
+          <span class="quick-item__label">目录</span>
           <span class="toolbar-badge" data-annotation-count hidden>0</span>
         </button>
-        <div class="theme-group">
-          <button class="theme-pill active" type="button" data-reader-theme="sepia">纸感</button>
-          <button class="theme-pill" type="button" data-reader-theme="day">晨光</button>
-          <button class="theme-pill" type="button" data-reader-theme="night">夜间</button>
-        </div>
+        <button class="quick-item" type="button" data-quick="font">
+          <span class="quick-item__icon quick-item__icon--font" aria-hidden="true"></span>
+          <span class="quick-item__label">字号</span>
+        </button>
+        <button class="quick-item" type="button" data-quick="theme">
+          <span class="quick-item__icon quick-item__icon--night" aria-hidden="true"></span>
+          <span class="quick-item__label">夜间</span>
+        </button>
+        <button class="quick-item" type="button" data-quick="settings" aria-controls="readerSettingsPanel" aria-expanded="false">
+          <span class="quick-item__icon quick-item__icon--settings" aria-hidden="true"></span>
+          <span class="quick-item__label">设置</span>
+        </button>
       </div>
     </footer>
   </main>
@@ -139,6 +153,55 @@
   </aside>
 
   <div class="immersive-toast" id="immersiveToast" aria-live="polite" aria-hidden="true"></div>
+
+  <aside class="reader-settings" id="readerSettings" aria-hidden="true">
+    <div class="reader-settings__backdrop" data-action="close-settings"></div>
+    <div class="reader-settings__panel" id="readerSettingsPanel" role="dialog" aria-modal="true" aria-labelledby="readerSettingsTitle" tabindex="-1">
+      <header class="reader-settings__header">
+        <div>
+          <h2 id="readerSettingsTitle">阅读设置</h2>
+          <p class="reader-settings__subtitle">调整字体与背景，找到最合适的阅读氛围</p>
+        </div>
+        <button class="reader-settings__close" type="button" data-action="close-settings" aria-label="关闭设置面板">×</button>
+      </header>
+      <section class="reader-settings__section">
+        <div class="settings-row">
+          <span class="settings-label">字号</span>
+          <div class="settings-slider">
+            <button class="settings-icon-btn" type="button" data-action="font-smaller" aria-label="减小字号">A−</button>
+            <input id="settingsFontSize" type="range" min="16" max="28" value="20" step="1">
+            <button class="settings-icon-btn" type="button" data-action="font-larger" aria-label="增大字号">A+</button>
+            <span class="settings-value" data-settings-font-display>20px</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">行距</span>
+          <div class="settings-lineheight">
+            <button class="pill-btn" type="button" data-line-height="1.6">舒缓</button>
+            <button class="pill-btn" type="button" data-line-height="1.8" aria-pressed="true">标准</button>
+            <button class="pill-btn" type="button" data-line-height="2.0">宽松</button>
+          </div>
+        </div>
+      </section>
+      <section class="reader-settings__section">
+        <span class="settings-label">背景</span>
+        <div class="settings-swatches" role="list">
+          <button class="swatch" type="button" data-theme="sepia" aria-label="纸感" aria-pressed="true"><span style="background:#f4e7d0"></span></button>
+          <button class="swatch" type="button" data-theme="day" aria-label="晨光"><span style="background:#f0f4ff"></span></button>
+          <button class="swatch" type="button" data-theme="night" aria-label="夜间"><span style="background:#141926"></span></button>
+          <button class="swatch" type="button" data-theme="ink" aria-label="墨青"><span style="background:#101a2a"></span></button>
+          <button class="swatch" type="button" data-theme="mint" aria-label="雾绿"><span style="background:#d7eee2"></span></button>
+        </div>
+      </section>
+      <section class="reader-settings__section">
+        <span class="settings-label">字体</span>
+        <div class="settings-fonts">
+          <button class="pill-btn" type="button" data-font="serif" aria-pressed="true">仿宋</button>
+          <button class="pill-btn" type="button" data-font="sans">简洁</button>
+        </div>
+      </section>
+    </div>
+  </aside>
 
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
   <script type="module" src="/js/main.js"></script>
