@@ -1245,6 +1245,28 @@ async function initImmersiveReader() {
     return Math.min(Math.max(ratio, 0), 1);
   }
 
+  function getBookmarkSnippet() {
+    if (!article) return "";
+    const currentScroll = scrollContainer ? scrollContainer.scrollTop : 0;
+    const blocks = article.querySelectorAll("p, blockquote, h2, h3, li");
+    let candidate = "";
+    for (const block of blocks) {
+      if (!block || typeof block.textContent !== "string") continue;
+      const top = block.offsetTop;
+      const bottom = top + block.offsetHeight;
+      if (bottom >= currentScroll + 12) {
+        candidate = block.textContent;
+        break;
+      }
+    }
+    if (!candidate) {
+      candidate = article.textContent || "";
+    }
+    const normalized = candidate.replace(/\s+/g, " ").trim();
+    if (!normalized) return "";
+    return normalized.length > 40 ? `${normalized.slice(0, 40)}…` : normalized;
+  }
+
   function handleBookmarkCreation({ fromDrawer = false } = {}) {
     if (!annotationsController || !currentChapterSlug) {
       showToast(Strings.annotations.bookmarkFailed);
@@ -1252,17 +1274,21 @@ async function initImmersiveReader() {
     }
     const maxScroll = Math.max(scrollContainer.scrollHeight - scrollContainer.clientHeight, 1);
     const percent = maxScroll > 0 ? scrollContainer.scrollTop / maxScroll : 0;
+    const bookPercent = computeBookProgress(percent);
+    const snippet = getBookmarkSnippet();
     const bookmark = annotationsController.createBookmark({
       slug: currentChapterSlug,
       percent,
-      scrollTop: scrollContainer.scrollTop
+      bookPercent,
+      scrollTop: scrollContainer.scrollTop,
+      snippet
     });
     if (!bookmark) {
       showToast(Strings.annotations.bookmarkFailed);
       return;
     }
     const chapterNumber = currentChapterIndex + 1;
-    const percentLabel = Math.round(percent * 100);
+    const percentLabel = Math.round(bookPercent * 100);
     refreshAnnotationsUI();
     showToast(
       Strings.annotations.fab?.bookmarkAdded
@@ -1412,21 +1438,25 @@ async function initImmersiveReader() {
           <button class="annotation-delete" type="button" data-action="delete" aria-label="${Strings.annotations.delete}">×</button>
         `;
       } else {
-        const percent = Math.round((item.percent || 0) * 100);
+        const bookPercent = Math.round(
+          (typeof item.bookPercent === "number" ? item.bookPercent : item.percent || 0) * 100
+        );
         const createdAt = new Date(item.createdAt);
         const timeStr = createdAt.toLocaleDateString("zh-CN", {
           month: "short",
           day: "numeric"
         });
+        const snippetText = (item.snippet || "").trim();
+        const snippet = snippetText ? escapeHtml(snippetText) : `书签 · ${bookPercent}%`;
         container.innerHTML = `
           <div class="annotation-content">
-            <div class="annotation-snippet">${percent}%</div>
+            <div class="annotation-snippet">${snippet}</div>
             ${
               item.note
                 ? `<div class="annotation-note">${escapeHtml(String(item.note))}</div>`
                 : ""
             }
-            <div class="annotation-meta">${timeStr}</div>
+            <div class="annotation-meta">${bookPercent}% · ${timeStr}</div>
           </div>
           <button class="annotation-delete" type="button" data-action="delete" aria-label="${Strings.annotations.delete}">×</button>
         `;

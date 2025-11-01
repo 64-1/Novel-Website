@@ -210,10 +210,19 @@ export const AnnotationStore = {
         bm.slug === String(slug || "").trim() &&
         typeof bm.percent === "number" &&
         bm.percent >= 0 &&
-        bm.percent <= 1
+        bm.percent <= 1 &&
+        (typeof bm.bookPercent !== "number" || (bm.bookPercent >= 0 && bm.bookPercent <= 1)) &&
+        (typeof bm.snippet === "undefined" || typeof bm.snippet === "string")
       );
     });
-    return filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return filtered
+      .map((bm) => ({
+        ...bm,
+        bookPercent:
+          typeof bm.bookPercent === "number" ? Math.min(Math.max(bm.bookPercent, 0), 1) : null,
+        snippet: typeof bm.snippet === "string" ? bm.snippet : ""
+      }))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   addBookmark(bm) {
@@ -231,14 +240,21 @@ export const AnnotationStore = {
       return false;
     }
     try {
+      const sanitized = {
+        ...bm,
+        bookPercent:
+          typeof bm.bookPercent === "number" ? Math.min(Math.max(bm.bookPercent, 0), 1) : null,
+        snippet: typeof bm.snippet === "string" ? bm.snippet : ""
+      };
       const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
       if (!Array.isArray(all)) {
-        storage.setItem(this.KEY_BOOKMARKS, JSON.stringify([bm]));
+        storage.setItem(this.KEY_BOOKMARKS, JSON.stringify([sanitized]));
+        this._notify();
         return true;
       }
       // Remove existing with same ID if present
-      const filtered = all.filter((item) => item.id !== bm.id);
-      filtered.push(bm);
+      const filtered = all.filter((item) => item.id !== sanitized.id);
+      filtered.push(sanitized);
       storage.setItem(this.KEY_BOOKMARKS, JSON.stringify(filtered));
       this._notify();
       return true;
