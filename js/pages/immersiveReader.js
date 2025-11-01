@@ -50,7 +50,7 @@ async function initImmersiveReader() {
   const topbarIndex = document.querySelector("[data-chapter-index]");
   const topbarMeta = document.querySelector("[data-chapter-meta]");
   const backButton = document.querySelector('[data-action="back"]');
-  const shareButton = document.querySelector('[data-action="share"]');
+  const topBookmarkButton = document.querySelector('[data-action="top-bookmark"]');
   const prevButton = document.querySelector('[data-action="prev-chapter"]');
   const nextButton = document.querySelector('[data-action="next-chapter"]');
   const themeButtons = document.querySelectorAll("[data-reader-theme]");
@@ -236,25 +236,10 @@ async function initImmersiveReader() {
     window.location.href = "/index.html";
   });
 
-  shareButton?.addEventListener("click", () => {
-    if (!currentChapterSlug) return;
-    const chapter = chapters[currentChapterIndex];
-    const shareUrl = buildShareUrl(currentChapterSlug);
-    const shareData = {
-      title: chapter?.title || Strings.meta.siteName,
-      text: Strings.meta.defaultDescription,
-      url: shareUrl
-    };
-
-    if (navigator.share) {
-      navigator.share(shareData).catch(() => {
-        copyToClipboard(shareUrl);
-        showToast("链接已复制");
-      });
-    } else {
-      copyToClipboard(shareUrl);
-      showToast("链接已复制");
-    }
+  topBookmarkButton?.addEventListener("click", () => {
+    topBookmarkButton.classList.add("is-pressed");
+    handleBookmarkCreation();
+    window.setTimeout(() => topBookmarkButton.classList.remove("is-pressed"), 420);
   });
 
   annotationsButton?.addEventListener("click", () => {
@@ -1801,15 +1786,6 @@ async function initImmersiveReader() {
     return readSlugInfo().slug;
   }
 
-  function buildShareUrl(slug) {
-    const origin = window.location.origin || "";
-    const url = new URL("/read.html", origin);
-    if (slug) {
-      url.searchParams.set("slug", slug);
-    }
-    return url.toString();
-  }
-
   function updateDocumentMeta(chapter) {
     if (!chapter) return;
     document.title = `${chapter.title} · 星海小说`;
@@ -1828,27 +1804,6 @@ async function initImmersiveReader() {
     const element = document.querySelector(`meta[${selector}]`);
     if (!element) return;
     element.setAttribute("content", content);
-  }
-
-  function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(() => {});
-      return;
-    }
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "absolute";
-    textarea.style.left = "-9999px";
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-      document.execCommand("copy");
-    } catch (error) {
-      console.warn("复制链接失败", error);
-    } finally {
-      document.body.removeChild(textarea);
-    }
   }
 
   function themeLabel(theme) {
