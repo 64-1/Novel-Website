@@ -109,6 +109,10 @@ async function initImmersiveReader() {
   const swatchButtons = settingsDrawer?.querySelectorAll(".swatch");
   const fontButtons = settingsDrawer?.querySelectorAll(".settings-fonts .pill-btn");
   let lastSettingsTrigger = null;
+  let chapterWordTotals = [];
+  let cumulativeChapterWords = [];
+  let totalBookWords = 0;
+  let totalChapters = 0;
 
   if (!stage || !article || !scrollContainer || !progressBar || !progressFill) {
     throw new Error("必需的阅读容器缺失");
@@ -129,7 +133,8 @@ async function initImmersiveReader() {
     progressBar,
     progressFill,
     context: "reader",
-    onProgress: handleProgress
+    onProgress: handleProgress,
+    renderProgress: updateBookProgress
   });
 
   const readerView = createReaderView({
@@ -150,6 +155,17 @@ async function initImmersiveReader() {
   if (!Array.isArray(chapters) || !chapters.length) {
     throw new Error("未找到章节内容");
   }
+  chapterWordTotals = chapters.map((chapter) => {
+    const stats = ChaptersRepo.getStats(chapter);
+    return stats.words > 0 ? stats.words : 1;
+  });
+  cumulativeChapterWords = [];
+  totalBookWords = 0;
+  chapterWordTotals.forEach((count, index) => {
+    totalBookWords += count;
+    cumulativeChapterWords[index] = totalBookWords;
+  });
+  totalChapters = chapters.length;
 
   let currentChapterIndex = resolveInitialIndex(chapters);
   let currentChapterSlug = null;
@@ -1210,9 +1226,38 @@ async function initImmersiveReader() {
   }
 
   function handleProgress(value) {
-    if (!progressLabel) return;
-    const percent = Math.round((Number(value) || 0) * 100);
-    progressLabel.textContent = `${percent}%`;
+    updateBookProgress(value);
+  }
+
+  function updateBookProgress(chapterProgress) {
+    if (!progressBar || !progressFill) return;
+    const bookProgress = computeBookProgress(chapterProgress);
+    const safeBookProgress = Math.min(Math.max(Number(bookProgress) || 0, 0), 1);
+    const percent = Math.round(safeBookProgress * 100);
+    progressFill.style.width = `${safeBookProgress * 100}%`;
+    progressBar.setAttribute("aria-valuenow", `${percent}`);
+    progressBar.setAttribute("aria-valuetext", `已阅读 ${percent}%`);
+    if (progressLabel) {
+      progressLabel.textContent = `${percent}%`;
+    }
+  }
+
+  function computeBookProgress(chapterProgress) {
+    const safeChapterProgress = Math.min(Math.max(Number(chapterProgress) || 0, 0), 1);
+    if (totalChapters <= 0) {
+      return safeChapterProgress;
+    }
+    const safeIndex = Math.max(0, Math.min(Number(currentChapterIndex) || 0, totalChapters - 1));
+    if (!chapterWordTotals.length || totalBookWords <= 0) {
+      const normalized =
+        totalChapters > 0 ? (safeIndex + safeChapterProgress) / totalChapters : safeChapterProgress;
+      return Math.min(Math.max(normalized, 0), 1);
+    }
+    const wordsBefore = safeIndex > 0 ? cumulativeChapterWords[safeIndex - 1] || 0 : 0;
+    const currentChapterWords = chapterWordTotals[safeIndex] || 0;
+    const absoluteWords = wordsBefore + currentChapterWords * safeChapterProgress;
+    const ratio = totalBookWords > 0 ? absoluteWords / totalBookWords : 0;
+    return Math.min(Math.max(ratio, 0), 1);
   }
 
   function handleBookmarkCreation({ fromDrawer = false } = {}) {
