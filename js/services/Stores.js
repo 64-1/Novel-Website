@@ -210,10 +210,19 @@ export const AnnotationStore = {
         bm.slug === String(slug || "").trim() &&
         typeof bm.percent === "number" &&
         bm.percent >= 0 &&
-        bm.percent <= 1
+        bm.percent <= 1 &&
+        (typeof bm.bookPercent !== "number" || (bm.bookPercent >= 0 && bm.bookPercent <= 1)) &&
+        (typeof bm.snippet === "undefined" || typeof bm.snippet === "string")
       );
     });
-    return filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return filtered
+      .map((bm) => ({
+        ...bm,
+        bookPercent:
+          typeof bm.bookPercent === "number" ? Math.min(Math.max(bm.bookPercent, 0), 1) : null,
+        snippet: typeof bm.snippet === "string" ? bm.snippet : ""
+      }))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   addBookmark(bm) {
@@ -231,14 +240,21 @@ export const AnnotationStore = {
       return false;
     }
     try {
+      const sanitized = {
+        ...bm,
+        bookPercent:
+          typeof bm.bookPercent === "number" ? Math.min(Math.max(bm.bookPercent, 0), 1) : null,
+        snippet: typeof bm.snippet === "string" ? bm.snippet : ""
+      };
       const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
       if (!Array.isArray(all)) {
-        storage.setItem(this.KEY_BOOKMARKS, JSON.stringify([bm]));
+        storage.setItem(this.KEY_BOOKMARKS, JSON.stringify([sanitized]));
+        this._notify();
         return true;
       }
       // Remove existing with same ID if present
-      const filtered = all.filter((item) => item.id !== bm.id);
-      filtered.push(bm);
+      const filtered = all.filter((item) => item.id !== sanitized.id);
+      filtered.push(sanitized);
       storage.setItem(this.KEY_BOOKMARKS, JSON.stringify(filtered));
       this._notify();
       return true;
@@ -382,13 +398,146 @@ export const AnnotationStore = {
   }
 };
 
+export const CodexStore = {
+  KEY: "novel:codex:entries:v1",
+  _subscribers: [],
+
+  subscribe(fn) {
+    if (typeof fn !== "function") {
+      return () => {};
+    }
+    this._subscribers.push(fn);
+    return () => {
+      const index = this._subscribers.indexOf(fn);
+      if (index >= 0) {
+        this._subscribers.splice(index, 1);
+      }
+    };
+  },
+
+  _notify() {
+    this._subscribers.forEach((fn) => {
+      try {
+        fn();
+      } catch (error) {
+        console.warn("[CodexStore] Subscriber error:", error);
+      }
+    });
+  },
+
+  loadAll() {
+    const parsed = safeParse(storage.getItem(this.KEY), []);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((entry) => this._normalize(entry)).filter(Boolean);
+  },
+
+  saveAll(entries) {
+    if (!Array.isArray(entries)) {
+      return false;
+    }
+    const normalized = entries.map((entry) => this._normalize(entry)).filter(Boolean);
+    try {
+      storage.setItem(this.KEY, JSON.stringify(normalized));
+      this._notify();
+      return true;
+    } catch (error) {
+      console.warn("[CodexStore] Failed to persist entries.", error);
+      return false;
+    }
+  },
+
+  add(entry) {
+    const normalized = this._normalize(entry);
+    if (!normalized) {
+      return false;
+    }
+    const existing = this.loadAll();
+    const index = existing.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) {
+      existing[index] = normalized;
+    } else {
+      existing.push(normalized);
+    }
+    return this.saveAll(existing);
+  },
+
+  remove(id) {
+    if (!id) return false;
+    const existing = this.loadAll();
+    const filtered = existing.filter((entry) => entry.id !== id);
+    return this.saveAll(filtered);
+  },
+
+  _normalize(entry) {
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
+    const id = typeof entry.id === "string" && entry.id.trim() ? entry.id.trim() : null;
+    const name = typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : null;
+    const type = typeof entry.type === "string" && entry.type.trim() ? entry.type.trim() : "concept";
+
+    if (!id || !name) {
+      return null;
+    }
+
+    const summary = typeof entry.summary === "string" ? entry.summary.trim() : "";
+    const tags = Array.isArray(entry.tags)
+      ? entry.tags.map((tag) => (typeof tag === "string" ? tag.trim() : "")).filter(Boolean)
+      : [];
+    const terms = Array.isArray(entry.terms)
+      ? entry.terms.map((term) => (typeof term === "string" ? term.trim() : "")).filter(Boolean)
+      : [];
+    const chapters = Array.isArray(entry.chapters)
+      ? entry.chapters.map((chap) => (typeof chap === "string" ? chap.trim() : "")).filter(Boolean)
+      : [];
+    const details = Array.isArray(entry.details)
+      ? entry.details
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const label = typeof item.label === "string" ? item.label.trim() : "";
+            const value = typeof item.value === "string" ? item.value.trim() : "";
+            if (!label && !value) return null;
+            return { label, value };
+          })
+          .filter(Boolean)
+      : [];
+    const timeline = Array.isArray(entry.timeline)
+      ? entry.timeline
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const label = typeof item.label === "string" ? item.label.trim() : "";
+            const value = typeof item.value === "string" ? item.value.trim() : "";
+            if (!label && !value) return null;
+            return { label, value };
+          })
+          .filter(Boolean)
+      : [];
+
+    return {
+      id,
+      type,
+      name,
+      summary,
+      tags,
+      terms,
+      chapters,
+      details,
+      timeline,
+      updatedAt: Date.now()
+    };
+  }
+};
+
 const Stores = Object.freeze({
   ReaderSettingsStore,
   DraftStore,
   ShellThemeStore,
   ProgressStore,
   LastReadStore,
-  AnnotationStore
+  AnnotationStore,
+  CodexStore
 });
 
 export default Stores;

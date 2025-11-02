@@ -24,6 +24,18 @@ const Strings = {
     noResults: "无结果",
     chaptersMatched: (count) => `共 ${count} 章命中`
   },
+  codex: {
+    drawerTitle: "世界观手册",
+    empty: "本章暂未收录世界观条目。",
+    jump: "定位正文",
+    noMention: "该条目在正文中暂未出现。",
+    saved: "条目已保存，可在阅读端的世界观手册中查看。",
+    removed: "条目已删除，阅读端将同步更新。",
+    origin: {
+      base: "官方设定",
+      user: "本地草稿"
+    }
+  },
   annotations: {
     addBookmark: "添加书签",
     bookmarks: "书签",

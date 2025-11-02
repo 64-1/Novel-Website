@@ -182,6 +182,61 @@
               <span class="filled"></span><span class="filled"></span><span></span><span class="filled"></span><span></span><span></span><span class="filled"></span>
             </div>
           </div>
+          <div class="sidebar-card codex-sidebar-card is-collapsed" id="codexSidebar">
+            <div class="codex-sidebar-header">
+              <div>
+                <h4>世界观手册</h4>
+                <p class="codex-sidebar-hint">整理角色、地点与设定，阅读端的「世界观」将同步更新。</p>
+              </div>
+              <div class="codex-sidebar-controls">
+                <span class="codex-pill" id="codexEntryCount" aria-live="polite">0 条</span>
+                <button
+                  class="codex-toggle"
+                  id="codexCollapseButton"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="codexSidebarBody"
+                >
+                  展开
+                </button>
+              </div>
+            </div>
+            <div class="codex-sidebar-body" id="codexSidebarBody" hidden>
+              <ul class="codex-sidebar-list" id="codexSidebarList" aria-live="polite"></ul>
+              <button class="btn ghost codex-create-button" id="codexToggleButton" data-action="toggle-codex-form" type="button">
+                新增条目
+              </button>
+              <form class="codex-form" id="codexForm" hidden>
+                <label class="input-label" for="codexType">条目类型</label>
+                <select id="codexType">
+                  <option value="character">角色</option>
+                  <option value="location">地点</option>
+                  <option value="concept" selected>设定</option>
+                  <option value="timeline">时间线</option>
+                  <option value="artifact">器物</option>
+                </select>
+                <label class="input-label" for="codexName">名称</label>
+                <input id="codexName" type="text" maxlength="40" placeholder="例如：黎川" required>
+                <label class="input-label" for="codexSummary">摘要</label>
+                <textarea id="codexSummary" rows="3" placeholder="一句话描述角色、地点或设定"></textarea>
+                <label class="input-label" for="codexTags">标签（逗号分隔）</label>
+                <input id="codexTags" type="text" placeholder="核心角色, 浮城">
+                <label class="input-label" for="codexTerms">正文关键词（逗号分隔）</label>
+                <input id="codexTerms" type="text" placeholder="黎川">
+                <label class="input-label" for="codexChapters">关联章节（slug，逗号分隔）</label>
+                <input id="codexChapters" type="text" placeholder="lightfall-ode, tide-echoes">
+                <label class="input-label" for="codexDetails">关键要点（每行“标签：内容”）</label>
+                <textarea id="codexDetails" rows="3" placeholder="身份：浮城记忆架构师"></textarea>
+                <label class="input-label" for="codexTimeline">时间线（每行“节点：片段”）</label>
+                <textarea id="codexTimeline" rows="3" placeholder="记忆回廊开启：第十四章午夜仪式启动"></textarea>
+                <div class="codex-form-actions">
+                  <button class="btn primary" data-action="save-codex-entry" type="submit">保存条目</button>
+                  <button class="btn ghost" data-action="cancel-codex-entry" type="button">取消</button>
+                </div>
+                <p class="codex-form-hint" id="codexFormHint" aria-live="polite"></p>
+              </form>
+            </div>
+          </div>
           <div class="sidebar-card music-card">
             <h4>写作音乐频道</h4>
             <p>选择氛围配乐，与文本情绪同步。</p>

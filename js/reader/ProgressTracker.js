@@ -10,7 +10,8 @@ export function createTracker({
   progressBar,
   progressFill,
   context = "reader",
-  onProgress
+  onProgress,
+  renderProgress: renderProgressOverride
 } = {}) {
   if (!container || !progressBar || !progressFill) {
     return null;
@@ -58,7 +59,7 @@ export function createTracker({
   function runUpdate() {
     lastRun = performance.now();
     const progress = getProgressFromScroll();
-    renderProgress(progress);
+    renderProgressInternal(progress);
     persistProgress(progress);
     notifyProgress(progress);
   }
@@ -78,8 +79,12 @@ export function createTracker({
     return { maxScroll, canScroll };
   }
 
-  function renderProgress(progress) {
+  function renderProgressInternal(progress) {
     const safeProgress = clampProgress(progress);
+    if (typeof renderProgressOverride === "function") {
+      renderProgressOverride(safeProgress, { progressBar, progressFill });
+      return;
+    }
     const percent = safeProgress * 100;
     progressFill.style.width = `${percent}%`;
     progressBar.setAttribute("aria-valuenow", `${Math.round(percent)}`);
@@ -106,7 +111,7 @@ export function createTracker({
       const targetProgress = canScroll ? storedProgress : 1;
       const targetScroll = canScroll ? targetProgress * maxScroll : 0;
       container.scrollTop = targetScroll;
-      renderProgress(targetProgress);
+      renderProgressInternal(targetProgress);
       notifyProgress(targetProgress);
       requestAnimationFrame(() => scheduleUpdate(true));
     });

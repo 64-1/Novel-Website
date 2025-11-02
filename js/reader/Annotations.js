@@ -222,7 +222,7 @@ export function createAnnotations({ articleEl, store, textMapBuilder = buildText
   /**
    * Creates a bookmark
    */
-  function createBookmark({ slug, percent, scrollTop = null, note = "" } = {}) {
+  function createBookmark({ slug, percent, bookPercent = null, scrollTop = null, note = "", snippet = "" } = {}) {
     if (!slug || typeof slug !== "string" || typeof percent !== "number" || percent < 0 || percent > 1) {
       return null;
     }
@@ -232,8 +232,10 @@ export function createAnnotations({ articleEl, store, textMapBuilder = buildText
       id,
       slug,
       percent: Math.max(0, Math.min(1, percent)),
+      bookPercent: typeof bookPercent === "number" ? Math.min(Math.max(bookPercent, 0), 1) : null,
       scrollTop: typeof scrollTop === "number" ? scrollTop : null,
       note: String(note || "").trim(),
+      snippet: String(snippet || "").trim(),
       createdAt: Date.now()
     };
 
