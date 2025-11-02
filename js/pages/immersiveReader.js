@@ -6,13 +6,7 @@ import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
 import { createAnnotations } from "../reader/Annotations.js";
 import Strings from "../strings.js";
-import { createReaderSettingsController } from "./immersiveReader/ReaderSettingsController.js";
-import { createChromeController } from "./immersiveReader/ChromeController.js";
-import { createToastController } from "./immersiveReader/ToastController.js";
-import { createDrawerController } from "./immersiveReader/DrawerController.js";
-import { createPopoverController } from "./immersiveReader/PopoverController.js";
-import { createNavigationController } from "./immersiveReader/NavigationController.js";
-import { copyToClipboard, populateHighlightSnippets } from "./immersiveReader/utils.js";
+import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
 const HIGHLIGHT_COLORS = ["ylw", "grn", "blu", "pnk"];
 const HIGHLIGHT_COLOR_LABELS = Strings.annotations.highlightColors || {};
@@ -249,7 +243,11 @@ async function initImmersiveReader() {
   });
 
   annotationsButton?.addEventListener("click", () => {
-    AnnotationsDrawer.toggle();
+    if (drawerOpen) {
+      closeAnnotationsDrawer();
+    } else {
+      openAnnotationsDrawer();
+    }
   });
 
   drawerAddBookmarkButton?.addEventListener("click", () => {
@@ -274,7 +272,7 @@ async function initImmersiveReader() {
 
   function handleSelectionPopover(event) {
     if (!highlightPopover || !article) return;
-    popoverController.cancelHide();
+    clearTimeout(selectionHideTimer);
 
     const selection = window.getSelection();
     if (
@@ -284,27 +282,29 @@ async function initImmersiveReader() {
       !article.contains(selection.anchorNode) ||
       !article.contains(selection.focusNode)
     ) {
-      popoverController.hide();
+      hideHighlightPopover();
       return;
     }
 
     const range = selection.getRangeAt(0);
     if (!range || range.collapsed) {
-      popoverController.hide();
+      hideHighlightPopover();
       return;
     }
 
-    popoverController.show(range);
+    showHighlightPopover(range);
   }
 
   scrollContainer.addEventListener("mouseup", handleSelectionPopover);
   scrollContainer.addEventListener("touchend", handleSelectionPopover);
 
   document.addEventListener("selectionchange", () => {
-    if (!popoverController.isVisible()) return;
+    if (!highlightPopoverVisible) return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
-      popoverController.scheduleHide(80);
+      selectionHideTimer = window.setTimeout(() => {
+        hideHighlightPopover();
+      }, 80);
     }
   });
 
@@ -313,7 +313,7 @@ async function initImmersiveReader() {
       setTimeout(() => {
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed) {
-          popoverController.hide();
+          hideHighlightPopover();
         }
       }, 20);
     }
@@ -328,8 +328,8 @@ async function initImmersiveReader() {
   });
 
   window.addEventListener("resize", () => {
-    if (popoverController.isVisible()) {
-      popoverController.hide();
+    if (highlightPopoverVisible) {
+      hideHighlightPopover();
     }
     if (codexPopoverVisible) {
       closeCodexPopover({ restoreFocus: false });
@@ -337,31 +337,30 @@ async function initImmersiveReader() {
   });
 
   scrollContainer.addEventListener("scroll", () => {
-    if (popoverController.isVisible()) {
-      popoverController.hide();
+    if (highlightPopoverVisible) {
+      hideHighlightPopover();
     }
     if (codexPopoverVisible) {
       closeCodexPopover({ restoreFocus: false });
     }
   });
 
-  annotationBackdrop?.addEventListener("click", () => AnnotationsDrawer.close());
+  annotationBackdrop?.addEventListener("click", () => closeAnnotationsDrawer());
   annotationDrawer
     ?.querySelectorAll("[data-action='close-annotations']")
-    .forEach((btn) => btn.addEventListener("click", () => AnnotationsDrawer.close()));
+    .forEach((btn) => btn.addEventListener("click", () => closeAnnotationsDrawer()));
 
   annotationTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       const tabName = tab.dataset.annotationTab;
-      if (!tabName) return;
-      if (AnnotationsDrawer.setTab(tabName)) {
-        annotationTabs.forEach((t) => t.classList.toggle("active", t === tab));
-        annotationTabs.forEach((t) =>
-          t.setAttribute("aria-selected", t.dataset.annotationTab === tabName ? "true" : "false")
-        );
-        if (AnnotationsDrawer.isOpen()) {
-          renderAnnotationsDrawer();
-        }
+      if (!tabName || currentAnnotationsTab === tabName) return;
+      currentAnnotationsTab = tabName;
+      annotationTabs.forEach((t) => t.classList.toggle("active", t === tab));
+      annotationTabs.forEach((t) =>
+        t.setAttribute("aria-selected", t.dataset.annotationTab === currentAnnotationsTab ? "true" : "false")
+      );
+      if (drawerOpen) {
+        renderAnnotationsDrawer();
       }
     });
   });
@@ -379,7 +378,7 @@ async function initImmersiveReader() {
         if (currentChapterSlug) {
           annotationsController.applyForChapter(currentChapterSlug);
         }
-        toastController.show(Strings.annotations.removed);
+        showToast(Strings.annotations.removed);
         refreshAnnotationsUI();
       }
       return;
@@ -388,12 +387,12 @@ async function initImmersiveReader() {
     if (id.startsWith("bm_")) {
       const jumped = annotationsController.jumpToBookmark(id, scrollContainer);
       if (jumped) {
-        AnnotationsDrawer.close();
+        closeAnnotationsDrawer();
       }
     } else if (id.startsWith("hl_")) {
       const jumped = annotationsController.jumpToHighlight(id);
       if (jumped) {
-        AnnotationsDrawer.close();
+        closeAnnotationsDrawer();
       }
     }
   });
@@ -663,7 +662,7 @@ async function initImmersiveReader() {
   });
 
   window.addEventListener("popstate", () => {
-    const slug = navigationController.readSlugFromUrl();
+    const slug = readSlugFromUrl();
     if (!slug) return;
     const index = ChaptersRepo.getIndexBySlug(slug);
     if (Number.isInteger(index) && index !== currentChapterIndex) {
@@ -708,7 +707,7 @@ async function initImmersiveReader() {
     if (!preserveChrome) {
       setChromeVisible(false, { force: true });
     }
-    popoverController.hide();
+    hideHighlightPopover();
 
     const ordinal = safeIndex + 1;
     const stats = ChaptersRepo.getStats(chapter);
@@ -728,11 +727,11 @@ async function initImmersiveReader() {
     refreshCodexEntries({ refreshUI: false });
     refreshAnnotationsUI();
     updateNavButtons();
-    navigationController.updateDocumentMeta(chapter);
+    updateDocumentMeta(chapter);
     LastReadStore.set({ slug: chapter.slug });
 
     if (updateUrl) {
-      navigationController.pushUrlWithSlug(chapter.slug);
+      pushUrlWithSlug(chapter.slug);
     }
 
     return true;
@@ -740,7 +739,7 @@ async function initImmersiveReader() {
 
   function refreshAnnotationsUI() {
     const counts = updateAnnotationBadge(currentChapterSlug);
-    if (AnnotationsDrawer.isOpen()) {
+    if (drawerOpen) {
       renderAnnotationsDrawer(counts);
     }
   }
@@ -1270,7 +1269,7 @@ async function initImmersiveReader() {
 
   function handleBookmarkCreation({ fromDrawer = false } = {}) {
     if (!annotationsController || !currentChapterSlug) {
-      toastController.show(Strings.annotations.bookmarkFailed);
+      showToast(Strings.annotations.bookmarkFailed);
       return;
     }
     const maxScroll = Math.max(scrollContainer.scrollHeight - scrollContainer.clientHeight, 1);
@@ -1285,13 +1284,13 @@ async function initImmersiveReader() {
       snippet
     });
     if (!bookmark) {
-      toastController.show(Strings.annotations.bookmarkFailed);
+      showToast(Strings.annotations.bookmarkFailed);
       return;
     }
     const chapterNumber = currentChapterIndex + 1;
     const percentLabel = Math.round(bookPercent * 100);
     refreshAnnotationsUI();
-    toastController.show(
+    showToast(
       Strings.annotations.fab?.bookmarkAdded
         ? Strings.annotations.fab.bookmarkAdded(chapterNumber, percentLabel)
         : Strings.annotations.addedBookmark
@@ -1300,7 +1299,7 @@ async function initImmersiveReader() {
 
   function handleHighlightCreation(color) {
     if (!annotationsController || !currentChapterSlug) {
-      toastController.show(Strings.annotations.highlightFailed);
+      showToast(Strings.annotations.highlightFailed);
       return;
     }
     const highlight = annotationsController.createHighlightFromSelection({
@@ -1309,12 +1308,12 @@ async function initImmersiveReader() {
       note: ""
     });
     if (!highlight) {
-      toastController.show(Strings.annotations.highlightFailed);
+      showToast(Strings.annotations.highlightFailed);
       return;
     }
     annotationsController.applyForChapter(currentChapterSlug);
     refreshAnnotationsUI();
-    popoverController.hide();
+    hideHighlightPopover();
     window.getSelection()?.removeAllRanges();
     showToast(Strings.annotations.addedHighlight);
   }
@@ -1385,15 +1384,14 @@ async function initImmersiveReader() {
     annotationList.innerHTML = "";
     annotationList.setAttribute("role", "list");
 
-    const currentTab = AnnotationsDrawer.getCurrentTab();
     annotationTabs.forEach((tab) => {
       const tabName = tab.dataset.annotationTab;
-      const isActive = tabName === currentTab;
+      const isActive = tabName === currentAnnotationsTab;
       tab.classList.toggle("active", isActive);
       tab.setAttribute("aria-selected", isActive ? "true" : "false");
     });
 
-    if (currentTab === "toc") {
+    if (currentAnnotationsTab === "toc") {
       renderTocList();
       return;
     }
@@ -1406,11 +1404,14 @@ async function initImmersiveReader() {
     const items = currentAnnotationsTab === "highlights" ? highlightItems : bookmarkItems;
 
     if (!items.length) {
-      AnnotationsDrawer.renderEmpty(currentTab);
+      const empty = document.createElement("div");
+      empty.className = "annotations-empty";
+      empty.textContent =
+        currentAnnotationsTab === "highlights" ? Strings.annotations.noHighlights : Strings.annotations.noBookmarks;
+      annotationList.appendChild(empty);
       return;
     }
 
-    const listElement = AnnotationsDrawer.getListElement();
     items.forEach((item) => {
       const container = document.createElement("div");
       container.className = "annotation-item";
@@ -1464,29 +1465,68 @@ async function initImmersiveReader() {
       annotationList.appendChild(container);
     });
 
-    if (currentTab === "highlights" && highlightItems.length) {
-      populateHighlightSnippets(highlightItems, article, annotationList);
+    if (currentAnnotationsTab === "highlights" && highlightItems.length) {
+      populateHighlightSnippets(highlightItems);
     }
   }
 
   function renderTocList() {
-    const listElement = AnnotationsDrawer.getListElement();
-    if (!listElement) return;
+    if (!annotationList) return;
+    annotationList.innerHTML = "";
+    annotationList.setAttribute("role", "list");
 
     chapters.forEach((chapter, index) => {
-      const button = AnnotationsDrawer.renderTocItem(chapter, index, index === currentChapterIndex, chapters.length);
+      const button = document.createElement("button");
+      button.className = "annotation-item annotation-item--toc";
+      button.type = "button";
+      button.dataset.chapterIndex = String(index);
+      button.setAttribute("role", "listitem");
+      button.setAttribute("tabindex", "0");
+
+      if (index === currentChapterIndex) {
+        button.classList.add("is-active");
+        button.setAttribute("aria-current", "true");
+      }
+
+      button.innerHTML = `
+        <div class="annotation-content">
+          <div class="annotation-snippet">${escapeHtml(chapter.title || `第 ${index + 1} 章`)}</div>
+          <div class="annotation-meta">${index + 1} / ${chapters.length}</div>
+        </div>
+        <span class="annotation-toc-arrow">›</span>
+      `;
 
       button.addEventListener("click", () => {
         if (index === currentChapterIndex) {
-          AnnotationsDrawer.close();
+          closeAnnotationsDrawer();
           return;
         }
         selectChapter(index, { updateUrl: true, preserveChrome: true });
-        AnnotationsDrawer.close();
+        closeAnnotationsDrawer();
       });
 
-      listElement.appendChild(button);
+      annotationList.appendChild(button);
     });
+  }
+
+  async function populateHighlightSnippets(highlights) {
+    if (!Array.isArray(highlights) || !highlights.length) return;
+    try {
+      const { buildTextMap } = await import("../reader/TextMap.js");
+      const textMap = buildTextMap(article);
+      highlights.forEach((item) => {
+        const range = textMap.offsetsToRange(item.start, item.end);
+        if (!range) return;
+        const snippet = range.toString().trim();
+        const target = annotationList?.querySelector(`[data-ann-id="${item.id}"] .annotation-snippet`);
+        if (target) {
+          const formatted = snippet.length > 60 ? `${snippet.slice(0, 60)}…` : snippet;
+          target.textContent = formatted || "高亮片段";
+        }
+      });
+    } catch (error) {
+      console.warn("[ImmersiveReader] 生成高亮摘要失败", error);
+    }
   }
 
   function updateAnnotationBadge(slug) {
@@ -1702,6 +1742,10 @@ async function initImmersiveReader() {
     if (!force && !visible && (drawerOpen || highlightPopoverVisible || codexPopoverVisible)) {
       return;
     }
+    body.classList.toggle("chrome-open", visible);
+    chromeElements.forEach((element) => {
+      element.hidden = !visible;
+    });
   }
 
   function resolveInitialIndex(chaptersList) {
