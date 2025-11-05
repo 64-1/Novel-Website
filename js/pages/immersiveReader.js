@@ -5,6 +5,8 @@ import ThemeService from "../services/ThemeService.js";
 import { createTracker } from "../reader/ProgressTracker.js";
 import { createReaderView } from "../reader/ReaderView.js";
 import { createAnnotations } from "../reader/Annotations.js";
+import ReadingAnalyticsStore from "../services/ReadingAnalyticsStore.js";
+import { createReadingAnalytics } from "../reader/ReadingAnalytics.js";
 import Strings from "../strings.js";
 import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
@@ -96,6 +98,7 @@ async function initImmersiveReader() {
 
   const toastEl = document.getElementById("immersiveToast");
   const quickbar = document.querySelector(".reader-quickbar");
+  const summaryQuickButton = quickbar?.querySelector(".quick-item[data-quick='analytics']");
   const settingsQuickButton = quickbar?.querySelector(".quick-item[data-quick='settings']");
   const settingsDrawer = document.getElementById("readerSettings");
   const settingsPanel = document.getElementById("readerSettingsPanel");
@@ -108,12 +111,44 @@ async function initImmersiveReader() {
   const lineHeightButtons = settingsDrawer?.querySelectorAll("[data-line-height]");
   const swatchButtons = settingsDrawer?.querySelectorAll(".swatch");
   const fontButtons = settingsDrawer?.querySelectorAll(".settings-fonts .pill-btn");
+  const summaryDrawer = document.getElementById("readerSummary");
+  const summaryPanel = document.getElementById("readerSummaryPanel");
+  const summaryBackdrop = summaryDrawer?.querySelector(".reader-summary__backdrop");
+  const summaryCloseButtons = summaryDrawer?.querySelectorAll('[data-action="close-summary"]');
+  const summaryStats = summaryDrawer?.querySelector("[data-analytics-stats]");
+  const summaryEmpty = summaryDrawer?.querySelector("[data-analytics-empty]");
+  const summaryTodayDuration = summaryDrawer?.querySelector("[data-analytics-today-duration]");
+  const summaryTodayWords = summaryDrawer?.querySelector("[data-analytics-today-words]");
+  const summaryStreakValue = summaryDrawer?.querySelector("[data-analytics-streak-value]");
+  const summaryStreakMeta = summaryDrawer?.querySelector("[data-analytics-streak-meta]");
+  const summaryPaceValue = summaryDrawer?.querySelector("[data-analytics-pace-value]");
+  const summaryPaceMeta = summaryDrawer?.querySelector("[data-analytics-pace-meta]");
+  const summaryRemainingValue = summaryDrawer?.querySelector("[data-analytics-remaining-value]");
+  const summaryRemainingMeta = summaryDrawer?.querySelector("[data-analytics-remaining-meta]");
+  const summaryTitleEl = summaryDrawer?.querySelector("[data-summary-title]");
+  const summarySubtitleEl = summaryDrawer?.querySelector("[data-summary-subtitle]");
+  const analyticsStrings = Strings.analytics || {};
   let lastSettingsTrigger = null;
+  let lastSummaryTrigger = null;
   let chapterWordTotals = [];
   let cumulativeChapterWords = [];
   let totalBookWords = 0;
   let totalChapters = 0;
+  let analyticsTracker = null;
 
+  if (summaryTitleEl && typeof analyticsStrings.title === "string") {
+    summaryTitleEl.textContent = analyticsStrings.title;
+  }
+  if (summarySubtitleEl && typeof analyticsStrings.subtitle === "string") {
+    summarySubtitleEl.textContent = analyticsStrings.subtitle;
+  }
+  if (summaryQuickButton) {
+    summaryQuickButton.setAttribute("aria-expanded", "false");
+    const summaryLabel = summaryQuickButton.querySelector(".quick-item__label");
+    if (summaryLabel && typeof analyticsStrings.title === "string") {
+      summaryLabel.textContent = analyticsStrings.title;
+    }
+  }
   if (!stage || !article || !scrollContainer || !progressBar || !progressFill) {
     throw new Error("必需的阅读容器缺失");
   }
@@ -166,6 +201,12 @@ async function initImmersiveReader() {
     cumulativeChapterWords[index] = totalBookWords;
   });
   totalChapters = chapters.length;
+  analyticsTracker = createReadingAnalytics({
+    store: ReadingAnalyticsStore,
+    onSummary: renderAnalyticsSummary
+  });
+  analyticsTracker.setTotalBookWords(totalBookWords);
+  renderAnalyticsSummary(analyticsTracker.getSummary());
 
   let currentChapterIndex = resolveInitialIndex(chapters);
   let currentChapterSlug = null;
@@ -422,6 +463,11 @@ async function initImmersiveReader() {
         event.preventDefault();
         return;
       }
+      if (isSummaryOpen()) {
+        closeSummaryDrawer();
+        event.preventDefault();
+        return;
+      }
       if (drawerOpen) {
         closeAnnotationsDrawer();
         event.preventDefault();
@@ -542,17 +588,10 @@ async function initImmersiveReader() {
     }
     event.preventDefault();
     switch (action) {
-      case "font": {
-        lastSettingsTrigger = button;
-        toggleSettingsDrawer(true);
-        const sliderWrap = settingsPanel?.querySelector(".settings-slider");
-        sliderWrap?.classList.add("is-highlight");
-        settingsFontSlider?.focus({ preventScroll: true });
-        window.setTimeout(() => {
-          sliderWrap?.classList.remove("is-highlight");
-        }, 1400);
-        button.classList.add("is-active");
-        window.setTimeout(() => button.classList.remove("is-active"), 600);
+      case "analytics": {
+        const targetState = !isSummaryOpen();
+        lastSummaryTrigger = button;
+        toggleSummaryDrawer(targetState);
         break;
       }
       case "theme": {
@@ -596,6 +635,9 @@ async function initImmersiveReader() {
         break;
     }
   });
+
+  summaryBackdrop?.addEventListener("click", closeSummaryDrawer);
+  summaryCloseButtons?.forEach((btn) => btn.addEventListener("click", closeSummaryDrawer));
 
   settingsBackdrop?.addEventListener("click", closeSettingsDrawer);
   settingsCloseButtons?.forEach((btn) => btn.addEventListener("click", closeSettingsDrawer));
@@ -679,12 +721,27 @@ async function initImmersiveReader() {
     refreshCodexEntries();
   });
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && analyticsTracker) {
+      analyticsTracker.flush();
+    }
+  });
+
   window.addEventListener("beforeunload", () => {
     if (typeof annotationUnsubscribe === "function") {
       annotationUnsubscribe();
     }
     if (typeof codexUnsubscribe === "function") {
       codexUnsubscribe();
+    }
+    if (analyticsTracker) {
+      analyticsTracker.flush();
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (analyticsTracker) {
+      analyticsTracker.flush();
     }
   });
 
@@ -703,6 +760,9 @@ async function initImmersiveReader() {
 
     currentChapterIndex = safeIndex;
     currentChapterSlug = chapter.slug;
+    if (analyticsTracker) {
+      analyticsTracker.setActiveChapter(chapter.slug);
+    }
 
     if (!preserveChrome) {
       setChromeVisible(false, { force: true });
@@ -1201,6 +1261,127 @@ async function initImmersiveReader() {
     return true;
   }
 
+  function renderAnalyticsSummary(summary) {
+    if (!summaryDrawer) return;
+    const data = summary || {};
+    const hasData = Boolean(data.hasData);
+
+    if (summaryEmpty && typeof analyticsStrings.empty === "string") {
+      summaryEmpty.textContent = analyticsStrings.empty;
+    }
+
+    if (summaryEmpty) {
+      summaryEmpty.hidden = hasData;
+    }
+    if (summaryStats) {
+      summaryStats.hidden = !hasData;
+      summaryStats.setAttribute("aria-hidden", hasData ? "false" : "true");
+    }
+
+    const todayMinutes = Math.max(0, Math.round(Number(data.todayMinutes) || 0));
+    const todayWords = Math.max(0, Math.round(Number(data.todayWords) || 0));
+    const streakDays = Math.max(0, Math.round(Number(data.streakDays) || 0));
+    const pace = Math.max(0, Math.round(Number(data.averageWordsPerMinute) || 0));
+    const percentComplete = Math.max(0, Math.min(100, Math.round(Number(data.percentComplete) || 0)));
+    const remainingMinutesValue = Number(data.remainingMinutes);
+
+    if (summaryTodayDuration) {
+      summaryTodayDuration.textContent = formatAnalyticsMinutes(todayMinutes);
+    }
+    if (summaryTodayWords) {
+      summaryTodayWords.textContent = formatAnalyticsWords(todayWords);
+    }
+    if (summaryStreakValue) {
+      summaryStreakValue.textContent = formatAnalyticsStreak(streakDays);
+    }
+    if (summaryStreakMeta) {
+      summaryStreakMeta.textContent =
+        todayMinutes > 0
+          ? analyticsStrings.streakMetaActive || "今日已打卡"
+          : analyticsStrings.streakMetaIdle || "今日尚未打卡";
+    }
+    if (summaryPaceValue) {
+      summaryPaceValue.textContent = formatAnalyticsPace(pace);
+    }
+    if (summaryPaceMeta) {
+      summaryPaceMeta.textContent = analyticsStrings.paceMeta || "最近 7 天";
+    }
+    if (summaryRemainingValue) {
+      if (remainingMinutesValue && remainingMinutesValue > 0) {
+        summaryRemainingValue.textContent = formatAnalyticsRemaining(Math.round(remainingMinutesValue));
+      } else if (percentComplete >= 100) {
+        summaryRemainingValue.textContent = analyticsStrings.completed || "已完本";
+      } else {
+        summaryRemainingValue.textContent = analyticsStrings.remainingUnknown || "阅读越多，预测会更准确";
+      }
+    }
+    if (summaryRemainingMeta) {
+      summaryRemainingMeta.textContent = formatAnalyticsPercent(percentComplete);
+    }
+  }
+
+  function formatAnalyticsMinutes(minutes) {
+    const safe = Math.max(0, Math.round(Number(minutes) || 0));
+    if (typeof analyticsStrings.minutes === "function") {
+      return analyticsStrings.minutes(safe);
+    }
+    return `${safe} 分钟`;
+  }
+
+  function formatAnalyticsWords(words) {
+    const safe = Math.max(0, Math.round(Number(words) || 0));
+    if (typeof analyticsStrings.wordsShort === "function") {
+      return analyticsStrings.wordsShort(safe);
+    }
+    if (safe >= 10000) {
+      const value = safe / 10000;
+      return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)} 万字`;
+    }
+    if (safe >= 1000) {
+      const value = safe / 1000;
+      return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)} 千字`;
+    }
+    return `${safe} 字`;
+  }
+
+  function formatAnalyticsStreak(days) {
+    const safe = Math.max(0, Math.round(Number(days) || 0));
+    if (typeof analyticsStrings.streak === "function") {
+      return analyticsStrings.streak(safe);
+    }
+    return `${safe} 天`;
+  }
+
+  function formatAnalyticsPace(wordsPerMinute) {
+    const safe = Math.max(0, Math.round(Number(wordsPerMinute) || 0));
+    if (safe <= 0) {
+      return analyticsStrings.paceUnavailable || "--";
+    }
+    if (typeof analyticsStrings.pace === "function") {
+      return analyticsStrings.pace(safe);
+    }
+    return `${safe} 字/分钟`;
+  }
+
+  function formatAnalyticsRemaining(minutes) {
+    const safe = Math.max(0, Math.round(Number(minutes) || 0));
+    if (safe <= 0) {
+      return analyticsStrings.remainingUnknown || "--";
+    }
+    if (typeof analyticsStrings.remaining === "function") {
+      return analyticsStrings.remaining(safe);
+    }
+    return `约 ${safe} 分钟`;
+  }
+
+  function formatAnalyticsPercent(percent) {
+    const safe = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+    if (typeof analyticsStrings.progressMeta === "function") {
+      return analyticsStrings.progressMeta(safe);
+    }
+    return `已完成 ${safe}%`;
+  }
+
   function updateNavButtons() {
     if (prevButton) {
       prevButton.disabled = currentChapterIndex <= 0;
@@ -1211,12 +1392,17 @@ async function initImmersiveReader() {
   }
 
   function handleProgress(value) {
-    updateBookProgress(value);
+    const bookProgress = updateBookProgress(value);
+    if (analyticsTracker && currentChapterSlug) {
+      analyticsTracker.recordProgress({ slug: currentChapterSlug, bookProgress });
+    }
   }
 
   function updateBookProgress(chapterProgress) {
-    if (!progressBar || !progressFill) return;
     const bookProgress = computeBookProgress(chapterProgress);
+    if (!progressBar || !progressFill) {
+      return bookProgress;
+    }
     const safeBookProgress = Math.min(Math.max(Number(bookProgress) || 0, 0), 1);
     const percent = Math.round(safeBookProgress * 100);
     progressFill.style.width = `${safeBookProgress * 100}%`;
@@ -1225,6 +1411,7 @@ async function initImmersiveReader() {
     if (progressLabel) {
       progressLabel.textContent = `${percent}%`;
     }
+    return bookProgress;
   }
 
   function computeBookProgress(chapterProgress) {
@@ -1669,6 +1856,9 @@ async function initImmersiveReader() {
   function toggleSettingsDrawer(forceOpen) {
     if (!settingsDrawer || !settingsPanel) return;
     const shouldOpen = forceOpen ?? settingsDrawer.getAttribute("aria-hidden") !== "false";
+    if (shouldOpen && isSummaryOpen()) {
+      toggleSummaryDrawer(false);
+    }
     settingsDrawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
     settingsQuickButton?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
     settingsQuickButton?.classList.toggle("is-active", shouldOpen);
@@ -1701,6 +1891,43 @@ async function initImmersiveReader() {
       lastSettingsTrigger.focus({ preventScroll: true });
       lastSettingsTrigger = null;
     }
+  }
+
+  function isSummaryOpen() {
+    return summaryDrawer?.getAttribute("aria-hidden") === "false";
+  }
+
+  function toggleSummaryDrawer(forceOpen) {
+    if (!summaryDrawer || !summaryPanel) return;
+    const shouldOpen = forceOpen ?? summaryDrawer.getAttribute("aria-hidden") !== "false";
+    if (shouldOpen) {
+      if (!lastSummaryTrigger) {
+        lastSummaryTrigger = summaryQuickButton || null;
+      }
+      if (isSettingsOpen()) {
+        toggleSettingsDrawer(false);
+      }
+    }
+    summaryDrawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+    summaryQuickButton?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    summaryQuickButton?.classList.toggle("is-active", shouldOpen);
+    if (shouldOpen) {
+      summaryPanel.focus({ preventScroll: true });
+    } else if (lastSummaryTrigger) {
+      lastSummaryTrigger.focus({ preventScroll: true });
+      lastSummaryTrigger = null;
+    }
+  }
+
+  function closeSummaryDrawer() {
+    if (!summaryDrawer) return;
+    if (!isSummaryOpen()) {
+      if (lastSummaryTrigger) {
+        lastSummaryTrigger = null;
+      }
+      return;
+    }
+    toggleSummaryDrawer(false);
   }
 
   function updateSettingsFontControls() {

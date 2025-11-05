@@ -94,9 +94,9 @@
           <span class="quick-item__label">目录</span>
           <span class="toolbar-badge" data-annotation-count hidden>0</span>
         </button>
-        <button class="quick-item" type="button" data-quick="font">
-          <span class="quick-item__icon quick-item__icon--font" aria-hidden="true"></span>
-          <span class="quick-item__label">字号</span>
+        <button class="quick-item" type="button" data-quick="analytics">
+          <span class="quick-item__icon quick-item__icon--summary" aria-hidden="true"></span>
+          <span class="quick-item__label">阅读统计</span>
         </button>
         <button class="quick-item" type="button" data-quick="theme">
           <span class="quick-item__icon quick-item__icon--night" aria-hidden="true"></span>
@@ -197,6 +197,51 @@
         <div class="settings-fonts">
           <button class="pill-btn" type="button" data-font="serif" aria-pressed="true">仿宋</button>
           <button class="pill-btn" type="button" data-font="sans">简洁</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <aside class="reader-summary" id="readerSummary" aria-hidden="true">
+    <div class="reader-summary__backdrop" data-action="close-summary"></div>
+    <div
+      class="reader-summary__panel"
+      id="readerSummaryPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="readerSummaryTitle"
+      tabindex="-1"
+    >
+      <header class="reader-summary__header">
+        <div>
+          <h2 id="readerSummaryTitle" data-summary-title>阅读统计</h2>
+          <p class="reader-summary__subtitle" data-summary-subtitle>回顾你的节奏与进度。</p>
+        </div>
+        <button class="reader-summary__close" type="button" data-action="close-summary" aria-label="关闭阅读统计">×</button>
+      </header>
+      <section class="reader-summary__section">
+        <p class="reader-summary__empty" data-analytics-empty>开始阅读，我们会在这里记录你的节奏。</p>
+        <div class="reader-summary__grid" data-analytics-stats hidden aria-hidden="true">
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">今日阅读</span>
+            <span class="reader-summary__value" data-analytics-today-duration>0 分钟</span>
+            <span class="reader-summary__meta" data-analytics-today-words>0 字</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">连读天数</span>
+            <span class="reader-summary__value" data-analytics-streak-value>0 天</span>
+            <span class="reader-summary__meta" data-analytics-streak-meta>今日尚未打卡</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">平均速度</span>
+            <span class="reader-summary__value" data-analytics-pace-value>--</span>
+            <span class="reader-summary__meta" data-analytics-pace-meta>最近 7 天</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">预计完本</span>
+            <span class="reader-summary__value" data-analytics-remaining-value>--</span>
+            <span class="reader-summary__meta" data-analytics-remaining-meta>已完成 0%</span>
+          </div>
         </div>
       </section>
     </div>

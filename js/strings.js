@@ -70,6 +70,34 @@ const Strings = {
       addNoteOptional: "添加备注（可选）",
       bookmarkAdded: (chapterNum, percent) => `已添加书签 · 第 ${chapterNum} 章 · ${percent}%`
     }
+  },
+  analytics: {
+    title: "阅读统计",
+    subtitle: "回顾你的节奏与进度。",
+    empty: "开始阅读，我们会在这里记录你的节奏。",
+    minutes: (mins) => `${mins} 分钟`,
+    wordsShort: (words) => {
+      const safe = Math.max(0, Math.round(words || 0));
+      if (safe >= 10000) {
+        const value = safe / 10000;
+        return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)} 万字`;
+      }
+      if (safe >= 1000) {
+        const value = safe / 1000;
+        return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)} 千字`;
+      }
+      return `${safe} 字`;
+    },
+    streak: (days) => `${days} 天`,
+    streakMetaActive: "今日已打卡",
+    streakMetaIdle: "今日尚未打卡",
+    pace: (wpm) => `${wpm} 字/分钟`,
+    paceMeta: "最近 7 天",
+    paceUnavailable: "--",
+    remaining: (mins) => `约 ${mins} 分钟`,
+    remainingUnknown: "阅读越多，预测会更准确",
+    completed: "已完本",
+    progressMeta: (percent) => `已完成 ${percent}%`
   }
 };
 
