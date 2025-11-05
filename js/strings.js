@@ -98,6 +98,32 @@ const Strings = {
     remainingUnknown: "阅读越多，预测会更准确",
     completed: "已完本",
     progressMeta: (percent) => `已完成 ${percent}%`
+  },
+  comments: {
+    title: "章节讨论",
+    empty: "目前还没有讨论，来分享你的第一条想法吧！",
+    placeholder: "写下你对本章的想法或问题…",
+    submit: "发布",
+    submitting: "发布中…",
+    hint: "最多 280 字",
+    count: (current, max) => `${current}/${max}`,
+    localAuthor: "我",
+    added: "评论已发布",
+    failed: "暂时无法发布，请稍后再试",
+    validation: "评论内容不能为空哦。",
+    timestamp: (date) => {
+      if (!(date instanceof Date)) return "";
+      const now = new Date();
+      const diff = now - date;
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (diff < minute) return "刚刚";
+      if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+      if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+      if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
+      return date.toLocaleDateString("zh-Hans", { month: "long", day: "numeric" });
+    }
   }
 };
 

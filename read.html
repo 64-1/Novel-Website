@@ -244,6 +244,31 @@
           </div>
         </div>
       </section>
+      <section class="reader-summary__section reader-summary__comments" data-summary-comments>
+        <header class="reader-summary__comments-header">
+          <h3 class="reader-summary__comments-title" data-summary-comments-title>章节讨论</h3>
+          <span class="reader-summary__comments-count" data-summary-comments-count>0</span>
+        </header>
+        <div class="reader-summary__comments-body">
+          <p class="reader-summary__comments-empty" data-comment-empty>目前还没有讨论，来分享你的第一条想法吧！</p>
+          <ul class="reader-summary__comments-list" data-comment-list role="list"></ul>
+        </div>
+        <form class="reader-summary__comments-form" data-comment-form novalidate>
+          <label class="sr-only" for="summaryCommentInput">发表评论</label>
+          <textarea
+            id="summaryCommentInput"
+            class="reader-summary__comments-input"
+            rows="3"
+            maxlength="280"
+            data-comment-input
+            placeholder="写下你对本章的想法或问题…"
+          ></textarea>
+          <div class="reader-summary__comments-actions">
+            <span class="reader-summary__comments-hint" data-comment-hint>最多 280 字</span>
+            <button class="reader-summary__comments-submit" type="submit" data-comment-submit>发布</button>
+          </div>
+        </form>
+      </section>
     </div>
   </aside>
 

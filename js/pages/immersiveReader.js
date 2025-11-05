@@ -7,6 +7,8 @@ import { createReaderView } from "../reader/ReaderView.js";
 import { createAnnotations } from "../reader/Annotations.js";
 import ReadingAnalyticsStore from "../services/ReadingAnalyticsStore.js";
 import { createReadingAnalytics } from "../reader/ReadingAnalytics.js";
+import CommentsRepo from "../services/CommentsRepo.js";
+import ReaderCommentsStore from "../services/ReaderCommentsStore.js";
 import Strings from "../strings.js";
 import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
@@ -127,7 +129,17 @@ async function initImmersiveReader() {
   const summaryRemainingMeta = summaryDrawer?.querySelector("[data-analytics-remaining-meta]");
   const summaryTitleEl = summaryDrawer?.querySelector("[data-summary-title]");
   const summarySubtitleEl = summaryDrawer?.querySelector("[data-summary-subtitle]");
+  const summaryCommentsSection = summaryDrawer?.querySelector("[data-summary-comments]");
+  const summaryCommentsTitle = summaryDrawer?.querySelector("[data-summary-comments-title]");
+  const summaryCommentsCount = summaryDrawer?.querySelector("[data-summary-comments-count]");
+  const summaryCommentList = summaryDrawer?.querySelector("[data-comment-list]");
+  const summaryCommentEmpty = summaryDrawer?.querySelector("[data-comment-empty]");
+  const summaryCommentForm = summaryDrawer?.querySelector("[data-comment-form]");
+  const summaryCommentInput = summaryDrawer?.querySelector("[data-comment-input]");
+  const summaryCommentSubmit = summaryDrawer?.querySelector("[data-comment-submit]");
+  const summaryCommentHint = summaryDrawer?.querySelector("[data-comment-hint]");
   const analyticsStrings = Strings.analytics || {};
+  const commentStrings = Strings.comments || {};
   let lastSettingsTrigger = null;
   let lastSummaryTrigger = null;
   let chapterWordTotals = [];
@@ -135,6 +147,9 @@ async function initImmersiveReader() {
   let totalBookWords = 0;
   let totalChapters = 0;
   let analyticsTracker = null;
+  let summaryComments = [];
+  let summaryCommentSubmitting = false;
+  const COMMENT_MAX_LENGTH = 280;
 
   if (summaryTitleEl && typeof analyticsStrings.title === "string") {
     summaryTitleEl.textContent = analyticsStrings.title;
@@ -149,6 +164,25 @@ async function initImmersiveReader() {
       summaryLabel.textContent = analyticsStrings.title;
     }
   }
+  if (summaryCommentsTitle && typeof commentStrings.title === "string") {
+    summaryCommentsTitle.textContent = commentStrings.title;
+  }
+  if (summaryCommentEmpty && typeof commentStrings.empty === "string") {
+    summaryCommentEmpty.textContent = commentStrings.empty;
+  }
+  if (summaryCommentInput && typeof commentStrings.placeholder === "string") {
+    summaryCommentInput.placeholder = commentStrings.placeholder;
+  }
+  if (summaryCommentHint && typeof commentStrings.hint === "string") {
+    summaryCommentHint.textContent = commentStrings.hint;
+  }
+  if (summaryCommentSubmit && typeof commentStrings.submit === "string") {
+    summaryCommentSubmit.textContent = commentStrings.submit;
+  }
+  if (summaryCommentsCount) {
+    summaryCommentsCount.textContent = "0";
+  }
+  updateCommentHintLength(summaryCommentInput ? summaryCommentInput.value.length : 0);
   if (!stage || !article || !scrollContainer || !progressBar || !progressFill) {
     throw new Error("必需的阅读容器缺失");
   }
@@ -186,6 +220,7 @@ async function initImmersiveReader() {
 
   await UniverseCodex.load();
   await ChaptersRepo.load();
+  await CommentsRepo.load();
   const chapters = ChaptersRepo.list();
   if (!Array.isArray(chapters) || !chapters.length) {
     throw new Error("未找到章节内容");
@@ -638,6 +673,21 @@ async function initImmersiveReader() {
 
   summaryBackdrop?.addEventListener("click", closeSummaryDrawer);
   summaryCloseButtons?.forEach((btn) => btn.addEventListener("click", closeSummaryDrawer));
+  summaryCommentForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    handleCommentSubmit();
+  });
+  summaryCommentInput?.addEventListener("input", (event) => {
+    const target = event.target;
+    const length = typeof target.value === "string" ? target.value.length : 0;
+    updateCommentHintLength(length);
+  });
+  summaryCommentInput?.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      handleCommentSubmit();
+    }
+  });
 
   settingsBackdrop?.addEventListener("click", closeSettingsDrawer);
   settingsCloseButtons?.forEach((btn) => btn.addEventListener("click", closeSettingsDrawer));
@@ -786,6 +836,7 @@ async function initImmersiveReader() {
     annotationsController.applyForChapter(chapter.slug);
     refreshCodexEntries({ refreshUI: false });
     refreshAnnotationsUI();
+    refreshSummaryComments({ preserveInput: false });
     updateNavButtons();
     updateDocumentMeta(chapter);
     LastReadStore.set({ slug: chapter.slug });
@@ -1318,6 +1369,150 @@ async function initImmersiveReader() {
     if (summaryRemainingMeta) {
       summaryRemainingMeta.textContent = formatAnalyticsPercent(percentComplete);
     }
+  }
+
+  function refreshSummaryComments({ preserveInput = false, scrollToLatest = false } = {}) {
+    if (!summaryDrawer) return;
+    if (!currentChapterSlug) {
+      summaryComments = [];
+      renderSummaryComments({ scrollToLatest: false });
+      return;
+    }
+    const base = CommentsRepo.getBySlug(currentChapterSlug);
+    const local = ReaderCommentsStore.list(currentChapterSlug);
+    summaryComments = [...base, ...local].sort((a, b) => a.createdAt - b.createdAt);
+    if (!preserveInput && summaryCommentInput) {
+      summaryCommentInput.value = "";
+    }
+    renderSummaryComments({ scrollToLatest });
+    updateCommentHintLength(summaryCommentInput ? summaryCommentInput.value.length : 0);
+  }
+
+  function renderSummaryComments({ scrollToLatest = false } = {}) {
+    if (!summaryCommentsSection) return;
+    const total = summaryComments.length;
+    if (summaryCommentsCount) {
+      summaryCommentsCount.textContent = String(total);
+    }
+    if (summaryCommentEmpty) {
+      summaryCommentEmpty.hidden = total > 0;
+    }
+    if (!summaryCommentList) return;
+    summaryCommentList.innerHTML = "";
+    if (!total) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    summaryComments.forEach((comment) => {
+      const item = document.createElement("li");
+      item.className = "reader-summary__comment";
+      item.dataset.commentId = comment.id || "";
+      item.setAttribute("role", "listitem");
+
+      const meta = document.createElement("div");
+      meta.className = "reader-summary__comment-meta";
+
+      const authorContainer = document.createElement("span");
+      authorContainer.className = "reader-summary__comment-author";
+      const authorName = document.createElement("span");
+      authorName.textContent = comment.author || commentStrings.localAuthor || "读者";
+      authorContainer.appendChild(authorName);
+      if (comment.local) {
+        const badge = document.createElement("span");
+        badge.className = "reader-summary__comment-badge";
+        badge.textContent = commentStrings.localAuthor || "我";
+        authorContainer.appendChild(badge);
+      }
+      meta.appendChild(authorContainer);
+
+      const dot = document.createElement("span");
+      dot.className = "reader-summary__comment-dot";
+      meta.appendChild(dot);
+
+      const time = document.createElement("span");
+      time.textContent = formatCommentTimestamp(comment.createdAt);
+      meta.appendChild(time);
+
+      item.appendChild(meta);
+
+      const content = document.createElement("p");
+      content.className = "reader-summary__comment-content";
+      content.textContent = comment.content || "";
+      item.appendChild(content);
+
+      fragment.appendChild(item);
+    });
+    summaryCommentList.appendChild(fragment);
+    if (scrollToLatest) {
+      summaryCommentList.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }
+
+  function updateCommentHintLength(length = 0) {
+    if (!summaryCommentHint) return;
+    const max = COMMENT_MAX_LENGTH;
+    const safe = Math.max(0, Math.min(Number(length) || 0, max));
+    const countLabel =
+      typeof commentStrings.count === "function" ? commentStrings.count(safe, max) : `${safe}/${max}`;
+    if (typeof commentStrings.hint === "string" && commentStrings.hint) {
+      summaryCommentHint.textContent = `${commentStrings.hint} · ${countLabel}`;
+    } else {
+      summaryCommentHint.textContent = countLabel;
+    }
+  }
+
+  function updateCommentSubmitState() {
+    if (!summaryCommentSubmit) return;
+    const defaultLabel =
+      typeof commentStrings.submit === "string" ? commentStrings.submit : summaryCommentSubmit.textContent || "发布";
+    const submittingLabel =
+      typeof commentStrings.submitting === "string" ? commentStrings.submitting : defaultLabel;
+    summaryCommentSubmit.disabled = summaryCommentSubmitting;
+    summaryCommentSubmit.textContent = summaryCommentSubmitting ? submittingLabel : defaultLabel;
+  }
+
+  function handleCommentSubmit() {
+    if (!currentChapterSlug || !summaryCommentInput) {
+      return;
+    }
+    if (summaryCommentSubmitting) {
+      return;
+    }
+    const value = summaryCommentInput.value.trim();
+    if (!value) {
+      showToast(commentStrings.validation || "评论内容不能为空");
+      summaryCommentInput.focus({ preventScroll: true });
+      return;
+    }
+    summaryCommentSubmitting = true;
+    updateCommentSubmitState();
+    const entry = ReaderCommentsStore.add({
+      slug: currentChapterSlug,
+      content: value,
+      author: commentStrings.localAuthor || "我"
+    });
+    summaryCommentSubmitting = false;
+    updateCommentSubmitState();
+    if (!entry) {
+      showToast(commentStrings.failed || "暂时无法发布，请稍后再试");
+      return;
+    }
+    summaryCommentInput.value = "";
+    updateCommentHintLength(0);
+    refreshSummaryComments({ preserveInput: true, scrollToLatest: true });
+    showToast(commentStrings.added || "评论已发布");
+  }
+
+  function formatCommentTimestamp(timestamp) {
+    if (!timestamp) return "";
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    if (typeof commentStrings.timestamp === "function") {
+      return commentStrings.timestamp(date);
+    }
+    return date.toLocaleString("zh-Hans", { hour: "2-digit", minute: "2-digit" });
   }
 
   function formatAnalyticsMinutes(minutes) {
@@ -1907,6 +2102,9 @@ async function initImmersiveReader() {
       if (isSettingsOpen()) {
         toggleSettingsDrawer(false);
       }
+      refreshSummaryComments({ preserveInput: true });
+      updateCommentHintLength(summaryCommentInput ? summaryCommentInput.value.length : 0);
+      updateCommentSubmitState();
     }
     summaryDrawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
     summaryQuickButton?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
