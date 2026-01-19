@@ -200,6 +200,7 @@ export function createAnnotations({ articleEl, store, textMapBuilder = buildText
       end: offsets.end,
       color,
       note: String(note || "").trim(),
+      selectedText: selection.toString().trim().slice(0, 500),
       createdAt: Date.now()
     };
 
@@ -329,4 +330,3 @@ export function createAnnotations({ articleEl, store, textMapBuilder = buildText
 export default {
   createAnnotations
 };
-

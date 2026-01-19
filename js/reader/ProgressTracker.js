@@ -11,7 +11,8 @@ export function createTracker({
   progressFill,
   context = "reader",
   onProgress,
-  renderProgress: renderProgressOverride
+  renderProgress: renderProgressOverride,
+  onPersist
 } = {}) {
   if (!container || !progressBar || !progressFill) {
     return null;
@@ -95,6 +96,16 @@ export function createTracker({
     storedProgress = clampProgress(progress);
     if (ProgressStore && typeof ProgressStore.save === "function") {
       ProgressStore.save(chapterSlug, context, storedProgress);
+    }
+    if (typeof onPersist === "function" && chapterSlug) {
+      const { maxScroll } = getScrollMetrics();
+      onPersist({
+        slug: chapterSlug,
+        progress: storedProgress,
+        scrollTop: container.scrollTop,
+        maxScroll,
+        context
+      });
     }
   }
 

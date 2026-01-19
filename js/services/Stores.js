@@ -150,6 +150,13 @@ export const AnnotationStore = {
   KEY_BOOKMARKS: "novel:ann:bookmarks:v1",
   KEY_HIGHLIGHTS: "novel:ann:highlights:v1",
   _subscribers: [],
+  _loadArray(key, fallback = []) {
+    const parsed = safeParse(storage.getItem(key), fallback);
+    return Array.isArray(parsed) ? parsed : [];
+  },
+  _saveArray(key, list) {
+    storage.setItem(key, JSON.stringify(list));
+  },
 
   // Subscribe/unsubscribe for pub-sub
   subscribe(fn) {
@@ -182,8 +189,7 @@ export const AnnotationStore = {
 
   // Bookmarks
   getAllBookmarks() {
-    const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
-    if (!Array.isArray(all)) return [];
+    const all = this._loadArray(this.KEY_BOOKMARKS, []);
     const validated = all.filter((bm) => {
       return (
         bm &&
@@ -199,8 +205,7 @@ export const AnnotationStore = {
   },
 
   getBookmarks(slug) {
-    const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
-    if (!Array.isArray(all)) return [];
+    const all = this._loadArray(this.KEY_BOOKMARKS, []);
     const filtered = all.filter((bm) => {
       return (
         bm &&
@@ -267,8 +272,7 @@ export const AnnotationStore = {
   removeBookmark(id) {
     if (typeof id !== "string" || !id.trim()) return false;
     try {
-      const all = safeParse(storage.getItem(this.KEY_BOOKMARKS), []);
-      if (!Array.isArray(all)) return false;
+      const all = this._loadArray(this.KEY_BOOKMARKS, []);
       const filtered = all.filter((item) => item.id !== id);
       if (filtered.length === all.length) return false; // Nothing removed
       storage.setItem(this.KEY_BOOKMARKS, JSON.stringify(filtered));
@@ -280,10 +284,35 @@ export const AnnotationStore = {
     }
   },
 
+  updateBookmark(id, patch = {}) {
+    if (typeof id !== "string" || !id.trim() || typeof patch !== "object") {
+      return false;
+    }
+    try {
+      const all = this._loadArray(this.KEY_BOOKMARKS, []);
+      const index = all.findIndex((item) => item.id === id);
+      if (index === -1) return false;
+      const updated = { ...all[index], ...patch };
+      if (
+        typeof updated.id !== "string" ||
+        typeof updated.slug !== "string" ||
+        typeof updated.percent !== "number"
+      ) {
+        return false;
+      }
+      all[index] = updated;
+      this._saveArray(this.KEY_BOOKMARKS, all);
+      this._notify();
+      return true;
+    } catch (error) {
+      console.warn("[AnnotationStore] Failed to update bookmark.", error);
+      return false;
+    }
+  },
+
   // Highlights
   getHighlights(slug) {
-    const all = safeParse(storage.getItem(this.KEY_HIGHLIGHTS), []);
-    if (!Array.isArray(all)) return [];
+    const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
     const filtered = all.filter((hl) => {
       return (
         hl &&
@@ -318,15 +347,15 @@ export const AnnotationStore = {
       return false;
     }
     try {
-      const all = safeParse(storage.getItem(this.KEY_HIGHLIGHTS), []);
-      if (!Array.isArray(all)) {
-        storage.setItem(this.KEY_HIGHLIGHTS, JSON.stringify([hl]));
+      const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
+      if (!Array.isArray(all) || all.length === 0) {
+        this._saveArray(this.KEY_HIGHLIGHTS, [hl]);
         return true;
       }
       // Remove existing with same ID if present
       const filtered = all.filter((item) => item.id !== hl.id);
       filtered.push(hl);
-      storage.setItem(this.KEY_HIGHLIGHTS, JSON.stringify(filtered));
+      this._saveArray(this.KEY_HIGHLIGHTS, filtered);
       return true;
     } catch (error) {
       console.warn("[AnnotationStore] Failed to add highlight.", error);
@@ -339,8 +368,7 @@ export const AnnotationStore = {
       return false;
     }
     try {
-      const all = safeParse(storage.getItem(this.KEY_HIGHLIGHTS), []);
-      if (!Array.isArray(all)) return false;
+      const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
       const index = all.findIndex((item) => item.id === id);
       if (index === -1) return false;
       const updated = { ...all[index], ...patch };
@@ -357,7 +385,7 @@ export const AnnotationStore = {
         return false;
       }
       all[index] = updated;
-      storage.setItem(this.KEY_HIGHLIGHTS, JSON.stringify(all));
+      this._saveArray(this.KEY_HIGHLIGHTS, all);
       return true;
     } catch (error) {
       console.warn("[AnnotationStore] Failed to update highlight.", error);
@@ -368,11 +396,10 @@ export const AnnotationStore = {
   removeHighlight(id) {
     if (typeof id !== "string" || !id.trim()) return false;
     try {
-      const all = safeParse(storage.getItem(this.KEY_HIGHLIGHTS), []);
-      if (!Array.isArray(all)) return false;
+      const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
       const filtered = all.filter((item) => item.id !== id);
       if (filtered.length === all.length) return false; // Nothing removed
-      storage.setItem(this.KEY_HIGHLIGHTS, JSON.stringify(filtered));
+      this._saveArray(this.KEY_HIGHLIGHTS, filtered);
       return true;
     } catch (error) {
       console.warn("[AnnotationStore] Failed to remove highlight.", error);
@@ -395,6 +422,68 @@ export const AnnotationStore = {
     const removedBookmark = this.removeBookmark(id);
     const removedHighlight = this.removeHighlight(id);
     return removedBookmark || removedHighlight;
+  },
+
+  setBookmarksForSlug(slug, bookmarks = []) {
+    if (!slug) return false;
+    const existing = this._loadArray(this.KEY_BOOKMARKS, []);
+    const remaining = existing.filter((bm) => bm.slug !== slug);
+    const sanitized = bookmarks
+      .map((bm) => ({
+        ...bm,
+        slug,
+        id: typeof bm.id === "string" ? bm.id : `bm_remote_${bm.createdAt || Date.now()}`,
+        createdAt: bm.createdAt || Date.now()
+      }))
+      .filter((bm) => typeof bm.percent === "number" && bm.percent >= 0 && bm.percent <= 1);
+    this._saveArray(this.KEY_BOOKMARKS, [...remaining, ...sanitized]);
+    this._notify();
+    return true;
+  },
+
+  setHighlightsForSlug(slug, highlights = []) {
+    if (!slug) return false;
+    const existing = this._loadArray(this.KEY_HIGHLIGHTS, []);
+    const remaining = existing.filter((hl) => hl.slug !== slug);
+    const sanitized = highlights
+      .map((hl) => ({
+        ...hl,
+        slug,
+        id: typeof hl.id === "string" ? hl.id : `hl_remote_${hl.createdAt || Date.now()}`,
+        createdAt: hl.createdAt || Date.now()
+      }))
+      .filter(
+        (hl) =>
+          typeof hl.start === "number" &&
+          typeof hl.end === "number" &&
+          hl.start >= 0 &&
+          hl.end > hl.start
+      );
+    this._saveArray(this.KEY_HIGHLIGHTS, [...remaining, ...sanitized]);
+    this._notify();
+    return true;
+  },
+
+  replaceBookmark(oldId, nextBookmark) {
+    if (!oldId || !nextBookmark) return false;
+    const all = this._loadArray(this.KEY_BOOKMARKS, []);
+    const index = all.findIndex((bm) => bm.id === oldId);
+    if (index === -1) return false;
+    all[index] = nextBookmark;
+    this._saveArray(this.KEY_BOOKMARKS, all);
+    this._notify();
+    return true;
+  },
+
+  replaceHighlight(oldId, nextHighlight) {
+    if (!oldId || !nextHighlight) return false;
+    const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
+    const index = all.findIndex((hl) => hl.id === oldId);
+    if (index === -1) return false;
+    all[index] = nextHighlight;
+    this._saveArray(this.KEY_HIGHLIGHTS, all);
+    this._notify();
+    return true;
   }
 };
 

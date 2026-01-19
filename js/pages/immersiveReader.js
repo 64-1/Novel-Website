@@ -1,4 +1,4 @@
-import { ReaderSettingsStore, LastReadStore, AnnotationStore } from "../services/Stores.js";
+import { ReaderSettingsStore, LastReadStore, AnnotationStore, ProgressStore } from "../services/Stores.js";
 import ChaptersRepo from "../services/ChaptersRepo.js";
 import UniverseCodex from "../services/UniverseCodex.js";
 import ThemeService from "../services/ThemeService.js";
@@ -9,6 +9,15 @@ import ReadingAnalyticsStore from "../services/ReadingAnalyticsStore.js";
 import { createReadingAnalytics } from "../reader/ReadingAnalytics.js";
 import CommentsRepo from "../services/CommentsRepo.js";
 import ReaderCommentsStore from "../services/ReaderCommentsStore.js";
+import { loadReaderPreferences, saveReaderPreferences } from "../services/PreferencesService.js";
+import { hydrateChapterProgress, queueProgressUpdate } from "../services/ProgressService.js";
+import {
+  hydrateAnnotations,
+  createRemoteBookmark,
+  deleteRemoteBookmark,
+  createRemoteHighlight,
+  deleteRemoteHighlight
+} from "../services/AnnotationService.js";
 import Strings from "../strings.js";
 import { escapeHtmlDom as escapeHtml } from "../utils/htmlSanitize.js";
 
@@ -147,6 +156,9 @@ async function initImmersiveReader() {
   let totalBookWords = 0;
   let totalChapters = 0;
   let analyticsTracker = null;
+  let analyticsHeartbeat = null;
+  const ANALYTICS_HEARTBEAT_MS = 20000;
+  let latestBookProgress = 0;
   let summaryComments = [];
   let summaryCommentSubmitting = false;
   const COMMENT_MAX_LENGTH = 280;
@@ -190,7 +202,7 @@ async function initImmersiveReader() {
   ThemeService.init({ body });
   ThemeService.applyStoredShellMode();
 
-  const readerSettings = loadReaderSettings();
+  const readerSettings = await loadReaderSettings();
   let lastNonNightTheme = readerSettings.theme === "night" ? "sepia" : readerSettings.theme || "sepia";
   applyReaderSettings();
   updateThemeButtons();
@@ -203,7 +215,8 @@ async function initImmersiveReader() {
     progressFill,
     context: "reader",
     onProgress: handleProgress,
-    renderProgress: updateBookProgress
+    renderProgress: updateBookProgress,
+    onPersist: handlePersistedProgress
   });
 
   const readerView = createReaderView({
@@ -242,9 +255,11 @@ async function initImmersiveReader() {
   });
   analyticsTracker.setTotalBookWords(totalBookWords);
   renderAnalyticsSummary(analyticsTracker.getSummary());
+  startAnalyticsHeartbeat();
 
   let currentChapterIndex = resolveInitialIndex(chapters);
   let currentChapterSlug = null;
+  let currentChapterMeta = null;
   let drawerOpen = false;
   let highlightPopoverVisible = false;
   let codexPopoverVisible = false;
@@ -456,6 +471,7 @@ async function initImmersiveReader() {
         }
         showToast(Strings.annotations.removed);
         refreshAnnotationsUI();
+        syncAnnotationRemoval(id);
       }
       return;
     }
@@ -772,8 +788,13 @@ async function initImmersiveReader() {
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden" && analyticsTracker) {
-      analyticsTracker.flush();
+    if (document.visibilityState === "hidden") {
+      if (analyticsTracker) {
+        analyticsTracker.flush();
+      }
+      stopAnalyticsHeartbeat();
+    } else if (document.visibilityState === "visible") {
+      startAnalyticsHeartbeat();
     }
   });
 
@@ -787,12 +808,14 @@ async function initImmersiveReader() {
     if (analyticsTracker) {
       analyticsTracker.flush();
     }
+    stopAnalyticsHeartbeat();
   });
 
   window.addEventListener("pagehide", () => {
     if (analyticsTracker) {
       analyticsTracker.flush();
     }
+    stopAnalyticsHeartbeat();
   });
 
   const initialResult = selectChapter(currentChapterIndex, { updateUrl: false, preserveChrome: false });
@@ -810,8 +833,13 @@ async function initImmersiveReader() {
 
     currentChapterIndex = safeIndex;
     currentChapterSlug = chapter.slug;
+    currentChapterMeta = chapter;
     if (analyticsTracker) {
       analyticsTracker.setActiveChapter(chapter.slug);
+    }
+    if (currentChapterSlug) {
+      const storedChapterProgress = ProgressStore.load(currentChapterSlug, "reader");
+      latestBookProgress = computeBookProgress(storedChapterProgress);
     }
 
     if (!preserveChrome) {
@@ -834,6 +862,13 @@ async function initImmersiveReader() {
     }
 
     annotationsController.applyForChapter(chapter.slug);
+    hydrateAnnotations({ slug: chapter.slug, chapterMeta: chapter }).then(() => {
+      annotationsController.applyForChapter(chapter.slug);
+      refreshAnnotationsUI();
+    });
+    hydrateChapterProgress(chapter.slug, chapter).then(() => {
+      tracker.refresh({ fromStorage: true });
+    });
     refreshCodexEntries({ refreshUI: false });
     refreshAnnotationsUI();
     refreshSummaryComments({ preserveInput: false });
@@ -1371,6 +1406,29 @@ async function initImmersiveReader() {
     }
   }
 
+  function startAnalyticsHeartbeat() {
+    if (analyticsHeartbeat) return;
+    if (!analyticsTracker) return;
+    analyticsHeartbeat = window.setInterval(() => {
+      if (!analyticsTracker || !currentChapterSlug) {
+        return;
+      }
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+      analyticsTracker.recordProgress({
+        slug: currentChapterSlug,
+        bookProgress: latestBookProgress
+      });
+    }, ANALYTICS_HEARTBEAT_MS);
+  }
+
+  function stopAnalyticsHeartbeat() {
+    if (!analyticsHeartbeat) return;
+    window.clearInterval(analyticsHeartbeat);
+    analyticsHeartbeat = null;
+  }
+
   function refreshSummaryComments({ preserveInput = false, scrollToLatest = false } = {}) {
     if (!summaryDrawer) return;
     if (!currentChapterSlug) {
@@ -1588,9 +1646,22 @@ async function initImmersiveReader() {
 
   function handleProgress(value) {
     const bookProgress = updateBookProgress(value);
+    latestBookProgress = bookProgress;
     if (analyticsTracker && currentChapterSlug) {
       analyticsTracker.recordProgress({ slug: currentChapterSlug, bookProgress });
     }
+  }
+
+  function handlePersistedProgress({ slug, progress, scrollTop }) {
+    if (!slug || slug !== currentChapterSlug) {
+      return;
+    }
+    queueProgressUpdate({
+      slug,
+      progress,
+      scrollTop,
+      chapterMeta: currentChapterMeta
+    });
   }
 
   function updateBookProgress(chapterProgress) {
@@ -1677,6 +1748,7 @@ async function initImmersiveReader() {
         ? Strings.annotations.fab.bookmarkAdded(chapterNumber, percentLabel)
         : Strings.annotations.addedBookmark
     );
+    createRemoteBookmark(bookmark, currentChapterMeta);
   }
 
   function handleHighlightCreation(color) {
@@ -1698,6 +1770,28 @@ async function initImmersiveReader() {
     hideHighlightPopover();
     window.getSelection()?.removeAllRanges();
     showToast(Strings.annotations.addedHighlight);
+    createRemoteHighlight(highlight, currentChapterMeta);
+  }
+
+  function syncAnnotationRemoval(id) {
+    if (!currentChapterSlug || !id) return;
+    if (id.startsWith("bm_")) {
+      deleteRemoteBookmark(id, currentChapterSlug);
+      return;
+    }
+    if (id.startsWith("hl_")) {
+      deleteRemoteHighlight(id, currentChapterSlug);
+      return;
+    }
+    const bookmark = AnnotationStore.getBookmarks(currentChapterSlug).find((bm) => bm.id === id);
+    if (bookmark) {
+      deleteRemoteBookmark(id, currentChapterSlug);
+      return;
+    }
+    const highlight = AnnotationStore.getHighlights(currentChapterSlug).find((hl) => hl.id === id);
+    if (highlight) {
+      deleteRemoteHighlight(id, currentChapterSlug);
+    }
   }
 
   function showHighlightPopover(range) {
@@ -2016,12 +2110,14 @@ async function initImmersiveReader() {
   }
 
   function persistReaderSettings() {
-    ReaderSettingsStore.save({
+    const payload = {
       fontSize: Math.min(Math.max(Number(readerSettings.fontSize) || 20, 16), 28),
       lineHeight: Number(readerSettings.lineHeight) || 1.8,
       theme: readerSettings.theme || "sepia",
       font: readerSettings.font === "sans" ? "sans" : "serif"
-    });
+    };
+    ReaderSettingsStore.save(payload);
+    saveReaderPreferences(payload);
   }
 
   function updateThemeButtons() {
@@ -2150,7 +2246,15 @@ async function initImmersiveReader() {
     });
   }
 
-  function loadReaderSettings() {
+  async function loadReaderSettings() {
+    try {
+      const prefs = await loadReaderPreferences();
+      if (prefs) {
+        return prefs;
+      }
+    } catch (error) {
+      console.warn("[ImmersiveReader] Failed to load reader preferences from API", error);
+    }
     const stored = ReaderSettingsStore.load();
     if (stored && typeof stored === "object") {
       return {
@@ -2266,3 +2370,4 @@ async function initImmersiveReader() {
   }
 
 }
+  
