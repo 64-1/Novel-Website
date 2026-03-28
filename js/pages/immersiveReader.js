@@ -231,9 +231,7 @@ async function initImmersiveReader() {
     store: AnnotationStore
   });
 
-  await UniverseCodex.load();
-  await ChaptersRepo.load();
-  await CommentsRepo.load();
+  await Promise.all([UniverseCodex.load(), ChaptersRepo.load(), CommentsRepo.load()]);
   const chapters = ChaptersRepo.list();
   if (!Array.isArray(chapters) || !chapters.length) {
     throw new Error("未找到章节内容");
@@ -273,6 +271,17 @@ async function initImmersiveReader() {
   let currentCodexEntries = [];
   let codexEntryMap = new Map();
   let codexTermMatchers = [];
+  let codexMentionWalker = null;
+  let codexMentionProcessHandle = null;
+  const scheduleIdleTask =
+    typeof window.requestIdleCallback === "function"
+      ? (callback) => window.requestIdleCallback(callback, { timeout: 120 })
+      : (callback) =>
+          window.setTimeout(() => {
+            callback({ didTimeout: true, timeRemaining: () => 0 });
+          }, 16);
+  const cancelIdleTask =
+    typeof window.cancelIdleCallback === "function" ? window.cancelIdleCallback : window.clearTimeout;
 
   stage.addEventListener("click", (event) => {
     if (event.defaultPrevented) return;
@@ -933,6 +942,7 @@ async function initImmersiveReader() {
   }
 
   function clearCodexMentions() {
+    cancelCodexMentionProcessing();
     codexMentionElements.forEach((element) => {
       const textContent = element.textContent || "";
       if (element.parentNode) {
@@ -944,11 +954,12 @@ async function initImmersiveReader() {
   }
 
   function applyCodexMentions() {
+    cancelCodexMentionProcessing();
     if (!article || !codexTermMatchers.length) {
       return;
     }
 
-    const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
+    codexMentionWalker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         if (!node || typeof node.nodeValue !== "string") {
           return NodeFilter.FILTER_REJECT;
@@ -970,47 +981,75 @@ async function initImmersiveReader() {
       }
     });
 
-    const textNodes = [];
-    while (walker.nextNode()) {
-      textNodes.push(walker.currentNode);
-    }
+    const processBatch = (deadline = { didTimeout: true, timeRemaining: () => 0 }) => {
+      if (!codexMentionWalker) return;
+      let processed = 0;
+      const MAX_NODES_PER_BATCH = 32;
+      while (codexMentionWalker && processed < MAX_NODES_PER_BATCH) {
+        const textNode = codexMentionWalker.nextNode();
+        if (!textNode) {
+          cancelCodexMentionProcessing();
+          return;
+        }
+        processCodexTextNode(textNode);
+        processed += 1;
+        const hasTime = typeof deadline.timeRemaining === "function" ? deadline.timeRemaining() > 4 : true;
+        if (!deadline.didTimeout && !hasTime) {
+          break;
+        }
+      }
+      if (codexMentionWalker) {
+        codexMentionProcessHandle = scheduleIdleTask(processBatch);
+      }
+    };
 
-    textNodes.forEach((textNode) => {
-      const text = textNode.nodeValue;
-      const matches = findCodexMatchesInText(text);
-      if (!matches.length) {
-        return;
+    codexMentionProcessHandle = scheduleIdleTask(processBatch);
+  }
+
+  function cancelCodexMentionProcessing() {
+    if (codexMentionProcessHandle !== null) {
+      cancelIdleTask(codexMentionProcessHandle);
+      codexMentionProcessHandle = null;
+    }
+    codexMentionWalker = null;
+  }
+
+  function processCodexTextNode(textNode) {
+    if (!textNode) return;
+    const text = textNode.nodeValue;
+    const matches = findCodexMatchesInText(text);
+    if (!matches.length) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    matches.forEach((match) => {
+      if (match.start > cursor) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor, match.start)));
       }
-      const fragment = document.createDocumentFragment();
-      let cursor = 0;
-      matches.forEach((match) => {
-        if (match.start > cursor) {
-          fragment.appendChild(document.createTextNode(text.slice(cursor, match.start)));
-        }
-        const entry = codexEntryMap.get(match.entryId);
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "codex-term";
-        button.dataset.codexId = match.entryId;
-        button.dataset.codexTerm = match.term;
-        button.setAttribute("data-codex-mention", "true");
-        button.setAttribute("aria-haspopup", "dialog");
-        button.textContent = match.term;
-        if (entry) {
-          const typeLabel = UniverseCodex.getTypeLabel(entry.type);
-          button.setAttribute("aria-label", `${entry.name} · ${typeLabel}`);
-        }
-        button.addEventListener("click", handleCodexTermClick);
-        button.addEventListener("keydown", handleCodexTermKeydown);
-        codexMentionElements.add(button);
-        fragment.appendChild(button);
-        cursor = match.end;
-      });
-      if (cursor < text.length) {
-        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      const entry = codexEntryMap.get(match.entryId);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "codex-term";
+      button.dataset.codexId = match.entryId;
+      button.dataset.codexTerm = match.term;
+      button.setAttribute("data-codex-mention", "true");
+      button.setAttribute("aria-haspopup", "dialog");
+      button.textContent = match.term;
+      if (entry) {
+        const typeLabel = UniverseCodex.getTypeLabel(entry.type);
+        button.setAttribute("aria-label", `${entry.name} · ${typeLabel}`);
       }
-      textNode.parentNode?.replaceChild(fragment, textNode);
+      button.addEventListener("click", handleCodexTermClick);
+      button.addEventListener("keydown", handleCodexTermKeydown);
+      codexMentionElements.add(button);
+      fragment.appendChild(button);
+      cursor = match.end;
     });
+    if (cursor < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+    textNode.parentNode?.replaceChild(fragment, textNode);
   }
 
   function findCodexMatchesInText(text) {
@@ -1416,10 +1455,14 @@ async function initImmersiveReader() {
       if (document.visibilityState === "hidden") {
         return;
       }
-      analyticsTracker.recordProgress({
-        slug: currentChapterSlug,
-        bookProgress: latestBookProgress
-      });
+      try {
+        analyticsTracker.recordProgress({
+          slug: currentChapterSlug,
+          bookProgress: latestBookProgress
+        });
+      } catch (error) {
+        console.warn("[ImmersiveReader] Analytics heartbeat error:", error);
+      }
     }, ANALYTICS_HEARTBEAT_MS);
   }
 
@@ -1748,7 +1791,9 @@ async function initImmersiveReader() {
         ? Strings.annotations.fab.bookmarkAdded(chapterNumber, percentLabel)
         : Strings.annotations.addedBookmark
     );
-    createRemoteBookmark(bookmark, currentChapterMeta);
+    createRemoteBookmark(bookmark, currentChapterMeta).catch((error) => {
+      console.warn("[ImmersiveReader] Failed to sync bookmark remotely", error);
+    });
   }
 
   function handleHighlightCreation(color) {
@@ -1770,7 +1815,9 @@ async function initImmersiveReader() {
     hideHighlightPopover();
     window.getSelection()?.removeAllRanges();
     showToast(Strings.annotations.addedHighlight);
-    createRemoteHighlight(highlight, currentChapterMeta);
+    createRemoteHighlight(highlight, currentChapterMeta).catch((error) => {
+      console.warn("[ImmersiveReader] Failed to sync highlight remotely", error);
+    });
   }
 
   function syncAnnotationRemoval(id) {
@@ -2351,16 +2398,16 @@ async function initImmersiveReader() {
     const description =
       chapter.summary ||
       (Array.isArray(chapter.paragraphs) ? String(chapter.paragraphs[0]?.text || "").slice(0, 64) : "");
-    updateMeta("description", description);
-    updateMeta('property="og:title"', document.title);
-    updateMeta('property="og:description"', description);
-    updateMeta('name="twitter:title"', document.title);
-    updateMeta('name="twitter:description"', description);
+    updateMeta("name", "description", description);
+    updateMeta("property", "og:title", document.title);
+    updateMeta("property", "og:description", description);
+    updateMeta("name", "twitter:title", document.title);
+    updateMeta("name", "twitter:description", description);
   }
 
-  function updateMeta(selector, content) {
+  function updateMeta(attrType, attrName, content) {
     if (!content) return;
-    const element = document.querySelector(`meta[${selector}]`);
+    const element = document.querySelector(`meta[${attrType}="${attrName}"]`);
     if (!element) return;
     element.setAttribute("content", content);
   }

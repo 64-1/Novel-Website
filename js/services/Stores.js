@@ -350,6 +350,7 @@ export const AnnotationStore = {
       const all = this._loadArray(this.KEY_HIGHLIGHTS, []);
       if (!Array.isArray(all) || all.length === 0) {
         this._saveArray(this.KEY_HIGHLIGHTS, [hl]);
+        this._notify();
         return true;
       }
       // Remove existing with same ID if present
