@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <title>创作者工作台 | 星海小说</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/pages/dashboard.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body class="dashboard-page">
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/">
+        <span class="brand-logo">星</span>
+        星海小说
+      </a>
+      <nav class="primary-nav">
+        <a href="/">首页</a>
+        <a href="/search/">发现</a>
+        <a href="/search/?sort=trending">排行</a>
+        <a href="/#bookshelf">书架</a>
+        <a href="/write/">创作</a>
+      </nav>
+      <div class="search-wrap header-search" role="search">
+        <input id="siteSearch" placeholder="搜索书名 / 作者 / 标签…" aria-label="搜索书籍">
+      </div>
+      <div class="header-actions" id="headerAuth">
+        <a href="/auth.html" class="btn auth-btn login-btn">登录</a>
+        <a href="/auth.html?mode=signup" class="btn primary auth-btn">注册</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard Content -->
+  <main class="dashboard-main">
+    <div class="dashboard-container">
+      <!-- Sidebar -->
+      <aside class="dashboard-sidebar">
+        <nav class="sidebar-nav">
+          <a href="#overview" class="sidebar-item sidebar-item--active" data-section="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            概览
+          </a>
+          <a href="#works" class="sidebar-item" data-section="works">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            我的作品
+          </a>
+          <a href="#drafts" class="sidebar-item" data-section="drafts">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            草稿箱
+          </a>
+          <a href="#analytics" class="sidebar-item" data-section="analytics">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            数据分析
+          </a>
+          <div class="sidebar-divider"></div>
+          <a href="#notifications" class="sidebar-item" data-section="notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            通知
+            <span class="sidebar-badge">2</span>
+          </a>
+          <a href="#settings" class="sidebar-item" data-section="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            设置
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <div class="dashboard-content">
+        <!-- Overview Section -->
+        <section id="overview" class="dashboard-section dashboard-section--active">
+          <div class="section-header">
+            <h1 class="section-title">欢迎回来，<span id="userName">创作者</span></h1>
+            <p class="section-subtitle">这里是您创作旅程的数据概览</p>
+          </div>
+
+          <!-- Stats Cards -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-card__icon stat-card__icon--reads">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+              <div class="stat-card__content">
+                <span class="stat-card__value" id="todayReads">127</span>
+                <span class="stat-card__label">今日阅读</span>
+                <span class="stat-card__change stat-card__change--up">+12%</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__icon stat-card__icon--bookmarks">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="stat-card__content">
+                <span class="stat-card__value" id="todayBookmarks">8</span>
+                <span class="stat-card__label">新增收藏</span>
+                <span class="stat-card__change stat-card__change--up">+3</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__icon stat-card__icon--words">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+              </div>
+              <div class="stat-card__content">
+                <span class="stat-card__value" id="todayWords">2,100</span>
+                <span class="stat-card__label">今日字数</span>
+                <span class="stat-card__change stat-card__change--up">已完成</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__icon stat-card__icon--followers">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div class="stat-card__content">
+                <span class="stat-card__value" id="todayFollowers">+3</span>
+                <span class="stat-card__label">新增粉丝</span>
+                <span class="stat-card__change stat-card__change--up">+2</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Writing Streak -->
+          <div class="streak-card">
+            <div class="streak-card__header">
+              <h2 class="streak-card__title">创作连续打卡</h2>
+              <span class="streak-badge">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                </svg>
+                当前连续 7 天
+              </span>
+            </div>
+            <div class="streak-calendar" id="streakCalendar">
+              <!-- Calendar days will be rendered here -->
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <h2 class="quick-actions__title">快捷操作</h2>
+            <div class="quick-actions__grid">
+              <a href="/write/" class="quick-action">
+                <div class="quick-action__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                </div>
+                <span class="quick-action__label">新建作品</span>
+              </a>
+              <a href="/write/" class="quick-action">
+                <div class="quick-action__icon quick-action__icon--writing">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                  </svg>
+                </div>
+                <span class="quick-action__label">继续写作</span>
+              </a>
+              <a href="#notifications" class="quick-action">
+                <div class="quick-action__icon quick-action__icon--comments">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <span class="quick-action__label">查看评论</span>
+              </a>
+              <a href="#works" class="quick-action">
+                <div class="quick-action__icon quick-action__icon--chapters">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="8" y1="6" x2="21" y2="6"/>
+                    <line x1="8" y1="12" x2="21" y2="12"/>
+                    <line x1="8" y1="18" x2="21" y2="18"/>
+                    <line x1="3" y1="6" x2="3.01" y2="6"/>
+                    <line x1="3" y1="12" x2="3.01" y2="12"/>
+                    <line x1="3" y1="18" x2="3.01" y2="18"/>
+                  </svg>
+                </div>
+                <span class="quick-action__label">管理章节</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Recent Works -->
+          <div class="recent-works">
+            <div class="section-header">
+              <h2 class="section-title">最近作品</h2>
+              <a href="#works" class="section-link">查看全部</a>
+            </div>
+            <div id="recentWorksList" class="works-list">
+              <!-- Works will be rendered here -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Works Section -->
+        <section id="works" class="dashboard-section">
+          <div class="section-header">
+            <h1 class="section-title">我的作品</h1>
+            <a href="/write/" class="btn primary">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              新建作品
+            </a>
+          </div>
+          <div id="worksSection" class="works-table-container">
+            <!-- Works table will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Drafts Section -->
+        <section id="drafts" class="dashboard-section">
+          <div class="section-header">
+            <h1 class="section-title">草稿箱</h1>
+          </div>
+          <div id="draftsSection" class="drafts-list">
+            <!-- Drafts will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="dashboard-section">
+          <div class="section-header">
+            <h1 class="section-title">数据分析</h1>
+            <div class="time-filter">
+              <button class="time-btn time-btn--active" data-range="7">近7天</button>
+              <button class="time-btn" data-range="30">近30天</button>
+              <button class="time-btn" data-range="90">近90天</button>
+            </div>
+          </div>
+          <div class="analytics-grid">
+            <div class="analytics-card analytics-card--wide">
+              <h3 class="analytics-card__title">阅读趋势</h3>
+              <div class="chart-placeholder">
+                <svg viewBox="0 0 200 80" preserveAspectRatio="none">
+                  <polyline fill="none" stroke="var(--primary)" stroke-width="2" points="
+                    0,60 20,50 40,55 60,40 80,45 100,30 120,35 140,25 160,30 180,20 200,15
+                  "/>
+                  <polygon fill="url(#chartGradient)" points="
+                    0,80 0,60 20,50 40,55 60,40 80,45 100,30 120,35 140,25 160,30 180,20 200,15 200,80
+                  "/>
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.3"/>
+                      <stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div class="chart-labels">
+                  <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                </div>
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3 class="analytics-card__title">收藏来源</h3>
+              <div class="pie-placeholder">
+                <div class="pie-chart">
+                  <div class="pie-segment" style="--value: 45%; --color: var(--primary)"></div>
+                  <div class="pie-segment" style="--value: 30%; --color: #10b981"></div>
+                  <div class="pie-segment" style="--value: 25%; --color: #f59e0b"></div>
+                </div>
+                <div class="pie-legend">
+                  <div class="legend-item"><span class="legend-dot" style="background: var(--primary)"></span>作品页 45%</div>
+                  <div class="legend-item"><span class="legend-dot" style="background: #10b981"></span>搜索 30%</div>
+                  <div class="legend-item"><span class="legend-dot" style="background: #f59e0b"></span>推荐 25%</div>
+                </div>
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3 class="analytics-card__title">读者地域分布</h3>
+              <div class="region-list">
+                <div class="region-item"><span class="region-name">北京</span><span class="region-bar" style="--value: 80%"></span><span class="region-value">23%</span></div>
+                <div class="region-item"><span class="region-name">上海</span><span class="region-bar" style="--value: 65%"></span><span class="region-value">18%</span></div>
+                <div class="region-item"><span class="region-name">广东</span><span class="region-bar" style="--value: 55%"></span><span class="region-value">15%</span></div>
+                <div class="region-item"><span class="region-name">浙江</span><span class="region-bar" style="--value: 40%"></span><span class="region-value">12%</span></div>
+                <div class="region-item"><span class="region-name">江苏</span><span class="region-bar" style="--value: 30%"></span><span class="region-value">8%</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notifications Section -->
+        <section id="notifications" class="dashboard-section">
+          <div class="section-header">
+            <h1 class="section-title">通知中心</h1>
+            <button class="btn ghost">全部已读</button>
+          </div>
+          <div id="notificationsList" class="notifications-list">
+            <!-- Notifications will be rendered here -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { authService } from './js/services/AuthService.js';
+    import { toast } from './js/services/ToastService.js';
+    import { createUserAvatarMenu } from './js/components/UserAvatarMenu.js';
+    import { createNovelCard } from './js/components/NovelCard.js';
+    import { createEmptyState } from './js/components/EmptyState.js';
+    import {
+      MOCK_USERS,
+      MOCK_NOVELS,
+      MOCK_DRAFTS,
+      MOCK_NOTIFICATIONS,
+      MOCK_DASHBOARD_STATS,
+      MOCK_READING_HISTORY,
+      getUserById,
+      getNovelBySlug
+    } from './js/data/mockData.js';
+
+    // Check auth
+    const currentUser = authService.getUser();
+    if (!currentUser) {
+      window.location.href = '/auth.html?redirect=/dashboard.html';
+    }
+
+    // Initialize header
+    function initHeader() {
+      const headerAuth = document.getElementById('headerAuth');
+      createUserAvatarMenu({
+        container: headerAuth,
+        onNavigate: (action, href) => {
+          if (action === 'logout') {
+            window.location.href = '/';
+          } else if (href) {
+            window.location.href = href;
+          }
+        }
+      });
+
+      // Update user name
+      if (currentUser) {
+        document.getElementById('userName').textContent = currentUser.displayName;
+      }
+    }
+
+    // Render streak calendar
+    function renderStreakCalendar() {
+      const calendar = document.getElementById('streakCalendar');
+      const days = MOCK_DASHBOARD_STATS.calendar;
+
+      calendar.innerHTML = days.map(day => {
+        const date = new Date(day.date);
+        const dayName = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+        const hasActivity = day.words > 0;
+        return `
+          <div class="calendar-day ${hasActivity ? 'calendar-day--active' : ''}">
+            <span class="calendar-day__name">${dayName}</span>
+            <span class="calendar-day__date">${date.getDate()}</span>
+            ${hasActivity ? `<span class="calendar-day__words">${day.words.toLocaleString()}</span>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render recent works
+    function renderRecentWorks() {
+      const container = document.getElementById('recentWorksList');
+      const userNovels = MOCK_NOVELS.filter(n => n.author.id === currentUser?.id);
+
+      if (userNovels.length === 0) {
+        container.appendChild(createEmptyState({
+          type: 'works',
+          actionText: '创建第一部作品',
+          onAction: () => window.location.href = '/write/'
+        }));
+        return;
+      }
+
+      container.innerHTML = userNovels.map(novel => `
+        <div class="work-item">
+          <img src="${novel.coverImage}" alt="${novel.title}" class="work-item__cover" />
+          <div class="work-item__body">
+            <h3 class="work-item__title">${novel.title}</h3>
+            <div class="work-item__meta">
+              <span class="work-item__status ${novel.status === 'ongoing' ? 'status--ongoing' : 'status--completed'}">
+                ${novel.status === 'ongoing' ? '连载中' : '已完结'}
+              </span>
+              <span>${novel.chapterCount} 章</span>
+              <span>${(novel.wordCount / 10000).toFixed(1)} 万字</span>
+            </div>
+            <div class="work-item__stats">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> ${novel.views.toLocaleString()}</span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> ${novel.bookmarks.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="work-item__actions">
+            <a href="/write/" class="btn secondary btn--sm">继续写作</a>
+            <button class="btn ghost btn--sm" data-action="more">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render works table
+    function renderWorksTable() {
+      const container = document.getElementById('worksSection');
+      const userNovels = MOCK_NOVELS.filter(n => n.author.id === currentUser?.id);
+
+      if (userNovels.length === 0) {
+        container.appendChild(createEmptyState({
+          type: 'works',
+          actionText: '创建第一部作品',
+          onAction: () => window.location.href = '/write/'
+        }));
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="works-table">
+          <thead>
+            <tr>
+              <th>作品</th>
+              <th>状态</th>
+              <th>字数</th>
+              <th>阅读</th>
+              <th>收藏</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${userNovels.map(novel => `
+              <tr>
+                <td>
+                  <div class="table-work">
+                    <img src="${novel.coverImage}" alt="" class="table-work__cover" />
+                    <div>
+                      <a href="#" class="table-work__title">${novel.title}</a>
+                      <span class="table-work__chapters">${novel.chapterCount} 章</span>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="table-status ${novel.status === 'ongoing' ? 'status--ongoing' : 'status--completed'}">
+                    ${novel.status === 'ongoing' ? '连载中' : '已完结'}
+                  </span>
+                </td>
+                <td>${novel.wordCount.toLocaleString()}</td>
+                <td>${novel.views.toLocaleString()}</td>
+                <td>${novel.bookmarks.toLocaleString()}</td>
+                <td>${novel.updatedAt}</td>
+                <td>
+                  <div class="table-actions">
+                    <button class="table-action" title="编辑">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="table-action" title="统计">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </button>
+                    <button class="table-action table-action--danger" title="删除">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Render drafts
+    function renderDrafts() {
+      const container = document.getElementById('draftsSection');
+      const userDrafts = MOCK_DRAFTS.filter(d => d.userId === currentUser?.id);
+
+      if (userDrafts.length === 0) {
+        container.appendChild(createEmptyState({
+          type: 'drafts',
+          actionText: '开始写作',
+          onAction: () => window.location.href = '/write/'
+        }));
+        return;
+      }
+
+      container.innerHTML = userDrafts.map(draft => `
+        <div class="draft-item">
+          <div class="draft-item__body">
+            <h3 class="draft-item__title">${draft.title || '无标题草稿'}</h3>
+            <p class="draft-item__preview">${draft.content ? draft.content.substring(0, 100) + '...' : '暂无内容'}</p>
+            <span class="draft-item__meta">${draft.wordCount} 字 · ${new Date(draft.lastModified).toLocaleString('zh-CN')}</span>
+          </div>
+          <div class="draft-item__actions">
+            <a href="/write/" class="btn primary btn--sm">继续写作</a>
+            <button class="btn ghost btn--sm">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render notifications
+    function renderNotifications() {
+      const container = document.getElementById('notificationsList');
+
+      const typeIcons = {
+        follow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>',
+        bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+        comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+        system: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+      };
+
+      container.innerHTML = MOCK_NOTIFICATIONS.map(notif => `
+        <div class="notification-item ${notif.read ? '' : 'notification-item--unread'}">
+          <div class="notification-item__avatar">
+            ${notif.actor ? `<img src="${notif.actor.avatar}" alt="" />` : typeIcons[notif.type]}
+          </div>
+          <div class="notification-item__body">
+            <p class="notification-item__content">
+              ${notif.actor ? `<strong>${notif.actor.displayName}</strong>` : ''} ${notif.content}
+            </p>
+            ${notif.comment ? `<p class="notification-item__comment">"${notif.comment}"</p>` : ''}
+            <span class="notification-item__time">${new Date(notif.createdAt).toLocaleString('zh-CN')}</span>
+          </div>
+          ${notif.novel ? `<img src="${notif.novel.coverImage}" alt="" class="notification-item__novel" />` : ''}
+          ${!notif.read ? '<span class="notification-item__dot"></span>' : ''}
+        </div>
+      `).join('');
+    }
+
+    // Section navigation
+    function initNavigation() {
+      const sidebarItems = document.querySelectorAll('.sidebar-item[data-section]');
+      const sections = document.querySelectorAll('.dashboard-section');
+
+      sidebarItems.forEach(item => {
+        item.addEventListener('click', e => {
+          e.preventDefault();
+          const sectionId = item.dataset.section;
+
+          // Update active states
+          sidebarItems.forEach(i => i.classList.remove('sidebar-item--active'));
+          item.classList.add('sidebar-item--active');
+
+          // Show section
+          sections.forEach(s => s.classList.remove('dashboard-section--active'));
+          document.getElementById(sectionId)?.classList.add('dashboard-section--active');
+
+          // Update URL
+          history.pushState({}, '', `#${sectionId}`);
+        });
+      });
+
+      // Handle initial hash
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        const item = document.querySelector(`.sidebar-item[data-section="${hash}"]`);
+        if (item) item.click();
+      }
+    }
+
+    // Initialize
+    initHeader();
+    renderStreakCalendar();
+    renderRecentWorks();
+    renderWorksTable();
+    renderDrafts();
+    renderNotifications();
+    initNavigation();
+  </script>
+</body>
+</html>

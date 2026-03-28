@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e5d6b6">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <title id="pageTitle">星海小说 · 沉浸式阅读</title>
+  <meta name="description" id="pageDescription" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="星海小说">
+  <meta property="og:title" id="ogTitle" content="星海小说 · 沉浸式阅读">
+  <meta property="og:description" id="ogDescription" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta property="og:url" content="">
+  <meta property="og:image" id="ogImage" content="/icons/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" id="twitterTitle" content="星海小说 · 沉浸式阅读">
+  <meta name="twitter:description" id="twitterDescription" content="沉浸式阅读空间与创作工具，陪你探索原创长篇的每一次心跳。">
+  <meta name="twitter:image" content="/icons/icon-512.png">
+  <link rel="canonical" id="canonicalUrl" href="/novel/">
+  <link rel="modulepreload" href="/js/main.js">
+  <link rel="modulepreload" href="/js/pages/immersiveReader.js">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body class="immersive-reader" data-reader-theme="sepia" data-novel-slug="">
+  <!-- Loading State -->
+  <div class="page-loading" id="pageLoading">
+    <div class="page-loading__inner">
+      <div class="page-loading__spinner"></div>
+      <p class="page-loading__text">正在加载...</p>
+    </div>
+  </div>
+
+  <!-- Novel Info (hidden, used for page title/meta) -->
+  <div id="novelInfo" hidden>
+    <span id="novelTitle"></span>
+    <span id="novelAuthor"></span>
+    <span id="novelCover"></span>
+    <span id="novelSynopsis"></span>
+  </div>
+
+  <main class="immersive-layout" hidden>
+    <header class="immersive-topbar" data-layer="chrome" data-chrome-surface>
+      <button class="topbar-btn" type="button" data-action="back" aria-label="返回上一页">
+        <span class="topbar-icon topbar-icon--back" aria-hidden="true"></span>
+      </button>
+      <div class="topbar-meta">
+        <span class="topbar-meta__label" data-chapter-index>开始</span>
+        <h1 class="topbar-meta__title" data-chapter-title>章节标题</h1>
+        <p class="topbar-meta__hint" data-chapter-meta></p>
+      </div>
+      <button class="topbar-btn" type="button" data-action="top-bookmark" aria-label="添加书签">
+        <span class="topbar-icon topbar-icon--bookmark" aria-hidden="true"></span>
+      </button>
+    </header>
+
+    <section class="immersive-stage" data-stage>
+      <div class="immersive-scroll" id="immersiveScroll">
+        <article class="immersive-article" id="immersiveArticle"></article>
+      </div>
+      <div class="highlight-popover" id="highlightPopover" role="toolbar" aria-hidden="true">
+        <button class="highlight-swatch highlight-swatch--ylw" type="button" data-color="ylw" aria-label="琥珀高亮"></button>
+        <button class="highlight-swatch highlight-swatch--grn" type="button" data-color="grn" aria-label="松柏高亮"></button>
+        <button class="highlight-swatch highlight-swatch--blu" type="button" data-color="blu" aria-label="雾蓝高亮"></button>
+        <button class="highlight-swatch highlight-swatch--pnk" type="button" data-color="pnk" aria-label="烟粉高亮"></button>
+      </div>
+      <div class="codex-popover" id="codexPopover" role="dialog" aria-hidden="true">
+        <div class="codex-popover__inner">
+          <button class="codex-popover__close" type="button" data-action="close-codex" aria-label="关闭世界观卡片">×</button>
+          <span class="codex-popover__badge" data-codex-tag></span>
+          <h3 class="codex-popover__title" data-codex-title></h3>
+          <p class="codex-popover__summary" data-codex-summary></p>
+          <ul class="codex-popover__details" data-codex-details></ul>
+          <ul class="codex-popover__timeline" data-codex-timeline></ul>
+          <div class="codex-popover__tags" data-codex-tags></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="immersive-toolbar" data-layer="chrome" data-chrome-surface>
+      <div class="toolbar-row toolbar-row--nav">
+        <button class="nav-pill nav-pill--prev" type="button" data-action="prev-chapter" title="上一章（快捷键 ←）">
+          <span class="nav-pill__icon" aria-hidden="true"></span>
+          <span class="nav-pill__text">上一章</span>
+          <span class="nav-pill__hint" aria-hidden="true">←</span>
+        </button>
+        <div class="progress-cluster">
+          <div class="immersive-progress" data-progress="immersive" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="阅读进度">
+            <span class="progress-track"></span>
+            <span class="progress-fill"></span>
+          </div>
+          <div class="progress-meta">
+            <span class="progress-label" data-progress-label>0%</span>
+          </div>
+        </div>
+        <button class="nav-pill nav-pill--next" type="button" data-action="next-chapter" title="下一章（快捷键 →）">
+          <span class="nav-pill__text">下一章</span>
+          <span class="nav-pill__hint" aria-hidden="true">→</span>
+          <span class="nav-pill__icon" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="reader-quickbar" role="group" aria-label="快速操作">
+        <button class="quick-item" type="button" data-quick="toc" data-action="toggle-annotations" aria-controls="annotationDrawerPanel" aria-expanded="false">
+          <span class="quick-item__icon quick-item__icon--toc" aria-hidden="true"></span>
+          <span class="quick-item__label">目录</span>
+          <span class="toolbar-badge" data-annotation-count hidden>0</span>
+        </button>
+        <button class="quick-item" type="button" data-quick="analytics">
+          <span class="quick-item__icon quick-item__icon--summary" aria-hidden="true"></span>
+          <span class="quick-item__label">阅读统计</span>
+        </button>
+        <button class="quick-item" type="button" data-quick="theme">
+          <span class="quick-item__icon quick-item__icon--night" aria-hidden="true"></span>
+          <span class="quick-item__label">夜间</span>
+        </button>
+        <button class="quick-item" type="button" data-quick="settings" aria-controls="readerSettingsPanel" aria-expanded="false">
+          <span class="quick-item__icon quick-item__icon--settings" aria-hidden="true"></span>
+          <span class="quick-item__label">设置</span>
+        </button>
+      </div>
+    </footer>
+  </main>
+
+  <aside class="annotations-drawer" id="annotationDrawer" aria-hidden="true">
+    <div class="annotations-drawer__backdrop" data-action="close-annotations"></div>
+    <div
+      class="annotations-drawer__panel"
+      id="annotationDrawerPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="annotationDrawerTitle"
+      tabindex="-1"
+    >
+      <header class="annotations-drawer__header">
+        <div>
+          <h2 id="annotationDrawerTitle">标注</h2>
+          <p class="annotations-drawer__subtitle">高亮与书签都会在这里集中管理</p>
+        </div>
+        <div class="annotations-drawer__actions">
+          <button class="annotations-drawer__bookmark" type="button" data-action="drawer-add-bookmark" aria-label="添加书签">＋</button>
+          <button class="annotations-drawer__close" type="button" data-action="close-annotations" aria-label="关闭标注面板">×</button>
+        </div>
+      </header>
+      <div class="annotations-drawer__tabs" role="tablist">
+        <button class="drawer-tab active" type="button" role="tab" aria-selected="true" data-annotation-tab="highlights">
+          高亮
+          <span class="drawer-tab__count" data-count="highlights">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="bookmarks">
+          书签
+          <span class="drawer-tab__count" data-count="bookmarks">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="codex">
+          世界观
+          <span class="drawer-tab__count" data-count="codex">0</span>
+        </button>
+        <button class="drawer-tab" type="button" role="tab" aria-selected="false" data-annotation-tab="toc">
+          目录
+        </button>
+      </div>
+      <div class="annotations-drawer__body" id="annotationList" role="list"></div>
+    </div>
+  </aside>
+
+  <div class="immersive-toast" id="immersiveToast" aria-live="polite" aria-hidden="true"></div>
+
+  <aside class="reader-settings" id="readerSettings" aria-hidden="true">
+    <div class="reader-settings__backdrop" data-action="close-settings"></div>
+    <div class="reader-settings__panel" id="readerSettingsPanel" role="dialog" aria-modal="true" aria-labelledby="readerSettingsTitle" tabindex="-1">
+      <header class="reader-settings__header">
+        <div>
+          <h2 id="readerSettingsTitle">阅读设置</h2>
+          <p class="reader-settings__subtitle">调整字体与背景，找到最合适的阅读氛围</p>
+        </div>
+        <button class="reader-settings__close" type="button" data-action="close-settings" aria-label="关闭设置面板">×</button>
+      </header>
+      <section class="reader-settings__section">
+        <div class="settings-row">
+          <span class="settings-label">字号</span>
+          <div class="settings-slider">
+            <button class="settings-icon-btn" type="button" data-action="font-smaller" aria-label="减小字号">A−</button>
+            <input id="settingsFontSize" type="range" min="16" max="28" value="20" step="1">
+            <button class="settings-icon-btn" type="button" data-action="font-larger" aria-label="增大字号">A+</button>
+            <span class="settings-value" data-settings-font-display>20px</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">行距</span>
+          <div class="settings-lineheight">
+            <button class="pill-btn" type="button" data-line-height="1.6">舒缓</button>
+            <button class="pill-btn" type="button" data-line-height="1.8" aria-pressed="true">标准</button>
+            <button class="pill-btn" type="button" data-line-height="2.0">宽松</button>
+          </div>
+        </div>
+      </section>
+      <section class="reader-settings__section">
+        <span class="settings-label">背景</span>
+        <div class="settings-swatches" role="list">
+          <button class="swatch" type="button" data-theme="sepia" aria-label="纸感" aria-pressed="true"><span style="background:#f4e7d0"></span></button>
+          <button class="swatch" type="button" data-theme="day" aria-label="晨光"><span style="background:#f0f4ff"></span></button>
+          <button class="swatch" type="button" data-theme="night" aria-label="夜间"><span style="background:#141926"></span></button>
+          <button class="swatch" type="button" data-theme="ink" aria-label="墨青"><span style="background:#101a2a"></span></button>
+          <button class="swatch" type="button" data-theme="mint" aria-label="雾绿"><span style="background:#d7eee2"></span></button>
+        </div>
+      </section>
+      <section class="reader-settings__section">
+        <span class="settings-label">字体</span>
+        <div class="settings-fonts">
+          <button class="pill-btn" type="button" data-font="serif" aria-pressed="true">仿宋</button>
+          <button class="pill-btn" type="button" data-font="sans">简洁</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <aside class="reader-summary" id="readerSummary" aria-hidden="true">
+    <div class="reader-summary__backdrop" data-action="close-summary"></div>
+    <div
+      class="reader-summary__panel"
+      id="readerSummaryPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="readerSummaryTitle"
+      tabindex="-1"
+    >
+      <header class="reader-summary__header">
+        <div>
+          <h2 id="readerSummaryTitle" data-summary-title>阅读统计</h2>
+          <p class="reader-summary__subtitle" data-summary-subtitle>回顾你的节奏与进度。</p>
+        </div>
+        <button class="reader-summary__close" type="button" data-action="close-summary" aria-label="关闭阅读统计">×</button>
+      </header>
+      <section class="reader-summary__section">
+        <p class="reader-summary__empty" data-analytics-empty>开始阅读，我们会在这里记录你的节奏。</p>
+        <div class="reader-summary__grid" data-analytics-stats hidden aria-hidden="true">
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">今日阅读</span>
+            <span class="reader-summary__value" data-analytics-today-duration>0 分钟</span>
+            <span class="reader-summary__meta" data-analytics-today-words>0 字</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">连读天数</span>
+            <span class="reader-summary__value" data-analytics-streak-value>0 天</span>
+            <span class="reader-summary__meta" data-analytics-streak-meta>今日尚未打卡</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">平均速度</span>
+            <span class="reader-summary__value" data-analytics-pace-value>--</span>
+            <span class="reader-summary__meta" data-analytics-pace-meta>最近 7 天</span>
+          </div>
+          <div class="reader-summary__item">
+            <span class="reader-summary__label">预计完本</span>
+            <span class="reader-summary__value" data-analytics-remaining-value>--</span>
+            <span class="reader-summary__meta" data-analytics-remaining-meta>已完成 0%</span>
+          </div>
+        </div>
+      </section>
+      <section class="reader-summary__section reader-summary__comments" data-summary-comments>
+        <header class="reader-summary__comments-header">
+          <h3 class="reader-summary__comments-title" data-summary-comments-title>章节讨论</h3>
+          <span class="reader-summary__comments-count" data-summary-comments-count>0</span>
+        </header>
+        <div class="reader-summary__comments-body">
+          <p class="reader-summary__comments-empty" data-comment-empty>目前还没有讨论，来分享你的第一条想法吧！</p>
+          <ul class="reader-summary__comments-list" data-comment-list role="list"></ul>
+        </div>
+        <form class="reader-summary__comments-form" data-comment-form novalidate>
+          <label class="sr-only" for="summaryCommentInput">发表评论</label>
+          <textarea
+            id="summaryCommentInput"
+            class="reader-summary__comments-input"
+            rows="3"
+            maxlength="280"
+            data-comment-input
+            placeholder="写下你对本章的想法或问题…"
+          ></textarea>
+          <div class="reader-summary__comments-actions">
+            <span class="reader-summary__comments-hint" data-comment-hint>最多 280 字</span>
+            <button class="reader-summary__comments-submit" type="submit" data-comment-submit>发布</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </aside>
+
+  <!-- 404 State -->
+  <div class="page-404" id="page404" hidden>
+    <div class="page-404__inner">
+      <h1 class="page-404__title">404</h1>
+      <p class="page-404__message">这本书暂时找不到</p>
+      <a href="/" class="btn primary">返回首页</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/pages/novel.js"></script>
+</body>
+</html>

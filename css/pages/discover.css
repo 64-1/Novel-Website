@@ -1,0 +1,237 @@
+/* ==========================================================================
+   Discover Page Styles
+   ========================================================================== */
+
+.discover-page {
+  background: var(--bg-base, #f5f7fb);
+  min-height: 100vh;
+}
+
+.discover-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 80px 0 60px;
+  text-align: center;
+}
+
+.discover-hero h1 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.discover-hero p {
+  font-size: 1.125rem;
+  opacity: 0.9;
+}
+
+.discover-content {
+  padding: 48px 0 80px;
+}
+
+/* Category Tabs */
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.category-tab {
+  padding: 8px 20px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 999px;
+  background: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-tab:hover {
+  border-color: var(--primary, #3a70ff);
+  color: var(--primary, #3a70ff);
+}
+
+.category-tab.active {
+  background: var(--primary, #3a70ff);
+  border-color: var(--primary, #3a70ff);
+  color: white;
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-heading, #1e293b);
+  margin-bottom: 24px;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+/* Featured Section */
+.featured-section {
+  margin-bottom: 64px;
+}
+
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.featured-item {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.featured-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.featured-cover {
+  width: 100px;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.featured-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.featured-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.featured-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--primary, #3a70ff);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  width: fit-content;
+}
+
+.featured-info h3 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-heading, #1e293b);
+  margin-bottom: 4px;
+}
+
+.featured-author {
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 8px;
+}
+
+.featured-synopsis {
+  font-size: 0.875rem;
+  color: var(--text-body, #334155);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* Novels Grid */
+.novels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px;
+}
+
+/* Collections Grid */
+.collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.collection-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.collection-card:hover {
+  transform: translateY(-4px);
+}
+
+.collection-cover {
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+}
+
+.collection-count {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-heading, #1e293b);
+}
+
+.collection-info {
+  padding: 16px;
+}
+
+.collection-info h3 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-heading, #1e293b);
+  margin-bottom: 4px;
+}
+
+.collection-info p {
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Novel Card Overrides for Discover */
+.discover-page .novel-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.discover-page .novel-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}

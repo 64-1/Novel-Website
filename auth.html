@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <title>登录 | 星海小说</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/pages/auth.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body class="auth-page">
+  <div class="auth-layout">
+    <!-- Left Panel - Brand -->
+    <div class="auth-panel auth-panel--brand">
+      <div class="auth-brand">
+        <div class="auth-brand__bg"></div>
+        <div class="auth-brand__content">
+          <div class="auth-brand__logo">
+            <span class="logo-star">星</span>
+            <span class="logo-text">海小说</span>
+          </div>
+          <blockquote class="auth-brand__quote">
+            <p>沉浸式阅读，灵感自由流动</p>
+          </blockquote>
+          <div class="auth-brand__features">
+            <div class="feature-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <span>海量原创中文小说</span>
+            </div>
+            <div class="feature-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <span>优雅的创作工具</span>
+            </div>
+            <div class="feature-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <span>温暖的创作者社区</span>
+            </div>
+          </div>
+        </div>
+        <div class="auth-brand__decoration">
+          <div class="deco-circle deco-circle--1"></div>
+          <div class="deco-circle deco-circle--2"></div>
+          <div class="deco-circle deco-circle--3"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Auth Form -->
+    <div class="auth-panel auth-panel--form">
+      <div class="auth-container">
+        <div id="authCard" class="auth-card-wrapper"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createAuthCard } from './js/components/AuthCard.js';
+
+    // Get initial mode from URL
+    const params = new URLSearchParams(window.location.search);
+    const initialMode = params.get('mode') === 'signup' ? 'signup' : 'login';
+
+    // Create auth card
+    const authCardContainer = document.getElementById('authCard');
+    const authCard = createAuthCard({
+      mode: initialMode,
+      onSuccess: () => {
+        // Redirect handled by component
+      },
+      onSwitchMode: (mode) => {
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('mode', mode);
+        history.pushState({}, '', url);
+      }
+    });
+
+    authCardContainer.appendChild(authCard.element);
+
+    // Check if already logged in
+    import { authService } from './js/services/AuthService.js';
+    if (authService.isAuthenticated()) {
+      const redirect = params.get('redirect') || '/';
+      window.location.href = redirect;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <title id="pageTitle">用户主页 | 星海小说</title>
+  <meta name="description" id="pageDescription" content="查看作者主页">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body class="profile-page">
+  <!-- Loading -->
+  <div class="page-loading" id="pageLoading">
+    <div class="page-loading__inner">
+      <div class="page-loading__spinner"></div>
+    </div>
+  </div>
+
+  <!-- 404 State -->
+  <div class="page-404" id="page404" hidden>
+    <div class="page-404__inner">
+      <h1>404</h1>
+      <p>用户不存在</p>
+      <a href="/" class="btn primary">返回首页</a>
+    </div>
+  </div>
+
+  <!-- Profile Content -->
+  <div class="profile-content" id="profileContent" hidden>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="/">
+          <span class="brand-logo">星</span>
+          星海小说
+        </a>
+        <nav class="primary-nav">
+          <a href="/">首页</a>
+          <a href="/discover/">发现</a>
+          <a href="/ranking/">趋势榜</a>
+          <a href="/library/">书架</a>
+          <a href="/write/">创作者工作室</a>
+        </nav>
+        <div class="search-wrap header-search" role="search">
+          <input id="siteSearch" placeholder="搜索书名 / 作者 / 标签…" aria-label="搜索书籍" autocomplete="off">
+          <div id="searchResults" class="results-panel" role="listbox" hidden></div>
+        </div>
+        <div class="header-actions" id="headerAuth"></div>
+      </div>
+    </header>
+
+    <!-- Profile Header -->
+    <section class="profile-header" id="profileHeader">
+      <div class="profile-cover" id="profileCover"></div>
+      <div class="container profile-header__inner">
+        <div class="profile-avatar">
+          <img id="profileAvatar" src="" alt="">
+        </div>
+        <div class="profile-info">
+          <div class="profile-name-row">
+            <h1 id="profileDisplayName"></h1>
+            <span class="profile-id" id="profileUsername"></span>
+          </div>
+          <p class="profile-bio" id="profileBio"></p>
+          <div class="profile-tags" id="profileTags"></div>
+          <div class="profile-stats">
+            <div class="profile-stat">
+              <span class="stat-value" id="statWorks">0</span>
+              <span class="stat-label">作品</span>
+            </div>
+            <div class="profile-stat">
+              <span class="stat-value" id="statFollowers">0</span>
+              <span class="stat-label">关注者</span>
+            </div>
+            <div class="profile-stat">
+              <span class="stat-value" id="statFollowing">0</span>
+              <span class="stat-label">关注</span>
+            </div>
+            <div class="profile-stat">
+              <span class="stat-value" id="statCollections">0</span>
+              <span class="stat-label">收藏</span>
+            </div>
+          </div>
+        </div>
+        <div class="profile-actions" id="profileActions">
+          <button class="btn primary" id="followBtn">关注</button>
+          <button class="btn secondary" id="messageBtn">私信</button>
+        </div>
+        <div class="profile-owner-actions" id="ownerActions" hidden>
+          <a href="/settings/" class="btn secondary">编辑资料</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Profile Tabs -->
+    <section class="profile-tabs-section">
+      <div class="container">
+        <nav class="profile-tabs" id="profileTabs">
+          <button class="profile-tab active" data-tab="works">作品</button>
+          <button class="profile-tab" data-tab="series">连载</button>
+          <button class="profile-tab" data-tab="bookmarks">收藏</button>
+          <button class="profile-tab" data-tab="about">关于</button>
+        </nav>
+      </div>
+    </section>
+
+    <!-- Tab Content -->
+    <main class="profile-main">
+      <div class="container">
+        <!-- Works Tab -->
+        <div class="tab-content active" id="tab-works">
+          <div class="works-grid" id="worksGrid"></div>
+        </div>
+
+        <!-- Series Tab -->
+        <div class="tab-content" id="tab-series">
+          <div class="series-list" id="seriesList"></div>
+        </div>
+
+        <!-- Bookmarks Tab -->
+        <div class="tab-content" id="tab-bookmarks">
+          <div class="bookmarks-grid" id="bookmarksGrid"></div>
+        </div>
+
+        <!-- About Tab -->
+        <div class="tab-content" id="tab-about">
+          <div class="about-section">
+            <h3>个人简介</h3>
+            <p id="aboutBio"></p>
+          </div>
+          <div class="about-section">
+            <h3>标签</h3>
+            <div class="about-tags" id="aboutTags"></div>
+          </div>
+          <div class="about-section">
+            <h3>统计数据</h3>
+            <div class="about-stats">
+              <div class="about-stat">
+                <span class="stat-value" id="aboutTotalReads">0</span>
+                <span class="stat-label">总阅读</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-logo">星</span>
+        <div>
+          <strong>星海小说</strong>
+          <p>让中文原创在温柔的光里闪耀。</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="/">首页</a>
+        <a href="/discover/">发现</a>
+        <a href="/ranking/">趋势榜</a>
+        <a href="/write/">创作者中心</a>
+      </div>
+      <p class="footer-note">© 2024 星海小说. Inspired by Pixiv Novels</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/pages/profile.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { trendingScore } from "../search/popularity.js";
+import { MOCK_NOVELS } from "../data/mockData.js";
 
 function formatRelativeUpdate(updatedValue) {
   if (!updatedValue) {
@@ -39,30 +40,56 @@ export async function initTrendingSection() {
   }
 
   try {
-    const response = await fetch("/data/books.json", { cache: "no-cache" });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch books (${response.status})`);
-    }
-    const data = await response.json();
-    if (!Array.isArray(data) || data.length === 0) {
-      container.innerHTML = `<div class="trending-empty" role="listitem">暂未收录数据</div>`;
+    // Show skeleton loaders first
+    container.innerHTML = `
+      <div class="trending-card trending-card--skeleton" role="listitem">
+        <div class="skeleton-cover"></div>
+        <div class="trending-meta">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-meta"></div>
+        </div>
+      </div>
+      <div class="trending-card trending-card--skeleton" role="listitem">
+        <div class="skeleton-cover"></div>
+        <div class="trending-meta">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-meta"></div>
+        </div>
+      </div>
+      <div class="trending-card trending-card--skeleton" role="listitem">
+        <div class="skeleton-cover"></div>
+        <div class="trending-meta">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-meta"></div>
+        </div>
+      </div>
+    `;
+
+    // Simulate network delay for realistic loading
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    // Use mock data instead of fetch
+    const novels = MOCK_NOVELS;
+
+    if (!novels || novels.length === 0) {
+      container.innerHTML = `<div class="trending-empty" role="listitem">暂无收录数据</div>`;
       return;
     }
 
-    const ranked = data
+    // Sort by trending score and take top 10
+    const ranked = novels
       .slice()
       .sort((a, b) => trendingScore(b) - trendingScore(a))
       .slice(0, 10);
 
     container.innerHTML = ranked
-      .map((item) => {
-        const title = item.title || item.title_zh || item.title_en || item.slug;
-        const slug = encodeURIComponent(item.slug);
-        const meta = formatRelativeUpdate(item.updated_at);
-        const hasCover = Boolean(item.cover);
+      .map((novel) => {
+        const slug = encodeURIComponent(novel.slug);
+        const meta = formatRelativeUpdate(novel.updatedAt);
+        const hasCover = Boolean(novel.coverImage);
         const coverClass = hasCover ? "trending-cover" : "trending-cover trending-cover--placeholder";
-        const coverImage = hasCover ? `<img src="${item.cover}" alt="${title} 封面">` : "";
-        const coverTitle = hasCover ? "" : `<span class="cover-title">${title}</span>`;
+        const coverImage = hasCover ? `<img src="${novel.coverImage}" alt="${novel.title} 封面">` : "";
+        const coverTitle = hasCover ? "" : `<span class="cover-title">${novel.title}</span>`;
         return `
           <a class="trending-card" role="listitem" href="/novel/${slug}">
             <div class="${coverClass}">
@@ -70,7 +97,7 @@ export async function initTrendingSection() {
               ${coverTitle}
             </div>
             <div class="trending-meta">
-              <span class="trending-title">${title}</span>
+              <span class="trending-title">${novel.title}</span>
               <span class="trending-updated">${meta}</span>
             </div>
           </a>

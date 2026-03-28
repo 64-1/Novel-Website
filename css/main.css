@@ -28,6 +28,18 @@
    ========================================================================== */
 @import url("pages/landing.css");
 @import url("pages/search-page.css");
+@import url("pages/auth.css");
+@import url("pages/profile.css");
+@import url("pages/dashboard.css");
+@import url("pages/discover.css");
+@import url("pages/ranking.css");
+@import url("pages/library.css");
+@import url("pages/settings.css");
+
+/* ==========================================================================
+   Toast Notifications
+   ========================================================================== */
+@import url("components/toast.css");
 
 /* ==========================================================================
    Reader

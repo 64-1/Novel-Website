@@ -22,11 +22,10 @@
         星海小说
       </a>
       <nav class="primary-nav">
-        <a href="#trending">趋势榜</a>
-        <a href="#discover">发现</a>
-        <a href="#reader">阅读体验</a>
+        <a href="/discover/">发现</a>
+        <a href="/ranking/">趋势榜</a>
+        <a href="/library/">书架</a>
         <a href="/write/">创作者工作室</a>
-        <a href="#community">灵感广场</a>
       </nav>
       <div class="search-wrap header-search" role="search">
         <input
@@ -43,9 +42,9 @@
         >
         <div id="searchResults" class="results-panel" role="listbox" hidden></div>
       </div>
-      <div class="header-actions">
-        <button class="btn ghost" data-action="toggle-theme">夜间模式</button>
-        <a class="btn primary" href="/write/">开始创作</a>
+      <div class="header-actions" id="headerAuth">
+        <a href="/auth.html" class="btn auth-btn login-btn" id="loginBtn">登录</a>
+        <a href="/auth.html?mode=signup" class="btn primary auth-btn" id="signupBtn">注册</a>
       </div>
     </div>
   </header>

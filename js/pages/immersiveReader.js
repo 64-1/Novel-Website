@@ -2350,21 +2350,35 @@ async function initImmersiveReader() {
 
   function pushUrlWithSlug(slug) {
     const url = new URL(window.location.href);
-    url.pathname = "/read.html";
+    // Update URL to use clean /novel/{slug} path
     if (slug) {
-      url.searchParams.set("slug", slug);
+      url.pathname = `/novel/${encodeURIComponent(slug)}`;
+      url.search = "";
+      url.hash = "";
     } else {
-      url.searchParams.delete("slug");
+      url.pathname = "/novel";
+      url.search = "";
+      url.hash = "";
     }
-    history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
+    history.replaceState(null, "", url.toString());
   }
 
   function readSlugInfo() {
+    // Match /novel/{slug} or /novel/{slug}/
     const pathMatch = window.location.pathname.match(/^\/novel\/([^/]+)\/?$/);
     if (pathMatch) {
       return {
         slug: decodeURIComponent(pathMatch[1]),
         source: "path"
+      };
+    }
+    // Support 'novel' parameter from novel.js redirect
+    const params = new URLSearchParams(window.location.search);
+    const novelSlug = params.get("novel");
+    if (novelSlug) {
+      return {
+        slug: novelSlug,
+        source: "query"
       };
     }
     const hashMatch = window.location.hash.match(/^#novel\/(.+)$/);
@@ -2374,7 +2388,6 @@ async function initImmersiveReader() {
         source: "hash"
       };
     }
-    const params = new URLSearchParams(window.location.search);
     const querySlug = params.get("slug");
     if (querySlug) {
       return {

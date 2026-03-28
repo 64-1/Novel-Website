@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#3a70ff">
+  <title>用户主页 | 星海小说</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/pages/profile.css">
+  <link rel="stylesheet" href="../css/pages/auth.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+</head>
+<body class="profile-page">
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/">
+        <span class="brand-logo">星</span>
+        星海小说
+      </a>
+      <nav class="primary-nav">
+        <a href="/">首页</a>
+        <a href="/search/">发现</a>
+        <a href="/search/?sort=trending">排行</a>
+        <a href="/#bookshelf">书架</a>
+        <a href="/write/">创作</a>
+      </nav>
+      <div class="search-wrap header-search" role="search">
+        <input
+          id="siteSearch"
+          placeholder="搜索书名 / 作者 / 标签…"
+          aria-label="搜索书籍"
+        >
+      </div>
+      <div class="header-actions" id="headerAuth">
+        <a href="/auth.html" class="btn auth-btn login-btn">登录</a>
+        <a href="/auth.html?mode=signup" class="btn primary auth-btn">注册</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Profile Content -->
+  <main class="profile-main">
+    <div id="profileContent" class="profile-content">
+      <!-- Loading State -->
+      <div class="profile-loading">
+        <div class="skeleton-cover"></div>
+        <div class="skeleton-profile">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-name"></div>
+          <div class="skeleton-bio"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <span class="brand-logo">星</span>
+          <span>星海小说</span>
+        </div>
+        <div class="footer-links">
+          <a href="/about.html">关于我们</a>
+          <a href="/terms.html">服务条款</a>
+          <a href="/privacy.html">隐私政策</a>
+        </div>
+        <p class="footer-copyright">© 2024 星海小说. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { authService } from '../js/services/AuthService.js';
+    import { toast } from '../js/services/ToastService.js';
+    import { createUserAvatarMenu } from '../js/components/UserAvatarMenu.js';
+    import { createProfileHeader } from '../js/components/ProfileHeader.js';
+    import { createProfileTabs, DEFAULT_PROFILE_TABS } from '../js/components/ProfileTabs.js';
+    import { createNovelCard, createNovelCardSkeleton } from '../js/components/NovelCard.js';
+    import { createEmptyState, createErrorState } from '../js/components/EmptyState.js';
+    import {
+      MOCK_USERS,
+      MOCK_NOVELS,
+      getUserByUsername,
+      getNovelsByAuthor,
+      getUserBookmarks
+    } from '../js/data/mockData.js';
+
+    // Get username from URL
+    const pathParts = window.location.pathname.split('/');
+    const username = pathParts[pathParts.length - 1]?.replace('.html', '') || '';
+
+    // State
+    let currentUser = null;
+    let profileUser = null;
+    let userNovels = [];
+    let isFollowing = false;
+    let activeTab = 'works';
+
+    // Initialize header auth
+    function initHeader() {
+      const headerAuth = document.getElementById('headerAuth');
+      currentUser = authService.getUser();
+
+      createUserAvatarMenu({
+        container: headerAuth,
+        onNavigate: (action, href) => {
+          if (action === 'logout') {
+            window.location.href = '/';
+          } else if (href) {
+            window.location.href = href;
+          }
+        }
+      });
+    }
+
+    // Load profile data
+    async function loadProfile() {
+      const content = document.getElementById('profileContent');
+
+      // Simulate loading
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Find user
+      profileUser = getUserByUsername(username);
+
+      if (!profileUser) {
+        content.innerHTML = '';
+        content.appendChild(createErrorState({
+          message: '用户不存在',
+          description: '该用户可能已注销或用户名错误',
+          retryText: '返回首页',
+          onRetry: () => window.location.href = '/'
+        }));
+        return;
+      }
+
+      // Get user's novels
+      userNovels = getNovelsByAuthor(profileUser.id);
+
+      // Check if current user is following
+      currentUser = authService.getUser();
+      isFollowing = currentUser && currentUser.id !== profileUser.id && Math.random() > 0.5;
+
+      // Update page title
+      document.title = `${profileUser.displayName} | 星海小说`;
+
+      // Render profile
+      renderProfile();
+    }
+
+    // Render profile
+    function renderProfile() {
+      const content = document.getElementById('profileContent');
+      const isOwner = currentUser?.id === profileUser.id;
+
+      // Check URL for active tab
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get('tab');
+      if (urlTab && DEFAULT_PROFILE_TABS.find(t => t.id === urlTab)) {
+        activeTab = urlTab;
+      }
+
+      content.innerHTML = `
+        <div class="profile-container">
+          <div id="profileHeader"></div>
+          <div id="profileTabs"></div>
+          <div id="profileTabContent" class="profile-tab-content"></div>
+        </div>
+      `;
+
+      // Create profile header
+      const headerContainer = content.querySelector('#profileHeader');
+      const header = createProfileHeader({
+        user: profileUser,
+        isOwner,
+        isFollowing,
+        onEdit: (type) => handleEdit(type),
+        onFollow: (following) => {
+          isFollowing = following;
+          profileUser.stats.followers += following ? 1 : -1;
+        },
+        onMessage: () => toast.info('消息功能开发中')
+      });
+      headerContainer.appendChild(header.element);
+
+      // Create tabs
+      const tabsContainer = content.querySelector('#profileTabs');
+      const tabs = [...DEFAULT_PROFILE_TABS];
+      // Add count to tabs
+      tabs.forEach(tab => {
+        if (tab.id === 'works') tab.count = userNovels.length;
+        if (tab.id === 'series') tab.count = userNovels.filter(n => n.status === 'ongoing').length;
+        if (tab.id === 'bookmarks') tab.count = isOwner ? 3 : 0;
+      });
+
+      const profileTabs = createProfileTabs({
+        activeTab,
+        tabs,
+        onTabChange: (tabId) => {
+          activeTab = tabId;
+          renderTabContent();
+        }
+      });
+      tabsContainer.appendChild(profileTabs.element);
+
+      // Render initial tab content
+      renderTabContent();
+    }
+
+    // Render tab content
+    function renderTabContent() {
+      const container = document.getElementById('profileTabContent');
+      if (!container) return;
+
+      container.innerHTML = '<div class="tab-loading"><span class="spinner"></span></div>';
+
+      setTimeout(() => {
+        switch (activeTab) {
+          case 'works':
+            renderWorksTab(container);
+            break;
+          case 'series':
+            renderSeriesTab(container);
+            break;
+          case 'bookmarks':
+            renderBookmarksTab(container);
+            break;
+          case 'about':
+            renderAboutTab(container);
+            break;
+          default:
+            renderWorksTab(container);
+        }
+      }, 300);
+    }
+
+    // Render works tab
+    function renderWorksTab(container) {
+      if (userNovels.length === 0) {
+        container.innerHTML = '';
+        const isOwner = currentUser?.id === profileUser.id;
+        container.appendChild(createEmptyState({
+          type: 'works',
+          actionText: isOwner ? '开始创作' : '',
+          onAction: isOwner ? () => window.location.href = '/write/' : null
+        }));
+        return;
+      }
+
+      // Filter options
+      const filters = ['全部', '连载中', '已完结'];
+      let activeFilter = filters[0];
+
+      container.innerHTML = `
+        <div class="works-filters">
+          ${filters.map(f => `
+            <button class="filter-btn ${activeFilter === f ? 'filter-btn--active' : ''}" data-filter="${f}">
+              ${f}
+            </button>
+          `).join('')}
+        </div>
+        <div id="worksGrid" class="novels-grid"></div>
+      `;
+
+      const grid = container.querySelector('#worksGrid');
+
+      // Filter buttons
+      container.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.filter;
+          container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('filter-btn--active'));
+          btn.classList.add('filter-btn--active');
+          renderWorks();
+        });
+      });
+
+      function renderWorks() {
+        grid.innerHTML = '';
+        let filtered = userNovels;
+
+        if (activeFilter === '连载中') {
+          filtered = userNovels.filter(n => n.status === 'ongoing');
+        } else if (activeFilter === '已完结') {
+          filtered = userNovels.filter(n => n.status === 'completed');
+        }
+
+        if (filtered.length === 0) {
+          grid.appendChild(createEmptyState({ type: 'works' }));
+          return;
+        }
+
+        filtered.forEach(novel => {
+          const card = createNovelCard(novel, {
+            showAuthor: false,
+            onClick: () => window.location.href = `/novel/${novel.slug}.html`
+          });
+          grid.appendChild(card);
+        });
+      }
+
+      renderWorks();
+    }
+
+    // Render series tab
+    function renderSeriesTab(container) {
+      const ongoingNovels = userNovels.filter(n => n.status === 'ongoing');
+
+      if (ongoingNovels.length === 0) {
+        container.innerHTML = '';
+        container.appendChild(createEmptyState({
+          type: 'works',
+          message: '暂无连载作品',
+          description: '正在连载的作品会显示在这里'
+        }));
+        return;
+      }
+
+      container.innerHTML = '<div id="seriesList" class="series-list"></div>';
+      const list = container.querySelector('#seriesList');
+
+      ongoingNovels.forEach(novel => {
+        const item = document.createElement('div');
+        item.className = 'series-item';
+        item.innerHTML = `
+          <img src="${novel.coverImage}" alt="${novel.title}" class="series-item__cover" />
+          <div class="series-item__body">
+            <h3 class="series-item__title">${novel.title}</h3>
+            <p class="series-item__synopsis">${novel.synopsis}</p>
+            <div class="series-item__meta">
+              <span>第 ${novel.chapterCount} 章</span>
+              <span class="dot">·</span>
+              <span>${(novel.wordCount / 10000).toFixed(1)} 万字</span>
+              <span class="dot">·</span>
+              <span>更新于 ${novel.updatedAt}</span>
+            </div>
+            <div class="series-item__chapters">
+              ${novel.chapters.slice(0, 3).map(ch => `
+                <a href="/novel/${novel.slug}.html#chapter-${ch.number}" class="chapter-link">
+                  第${ch.number}章 · ${ch.title}
+                </a>
+              `).join('')}
+            </div>
+          </div>
+          <a href="/novel/${novel.slug}.html" class="btn secondary series-item__btn">继续阅读</a>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    // Render bookmarks tab
+    function renderBookmarksTab(container) {
+      const isOwner = currentUser?.id === profileUser.id;
+
+      if (!isOwner) {
+        container.innerHTML = '';
+        container.appendChild(createEmptyState({
+          type: 'bookmarks',
+          message: '收藏仅对作者可见'
+        }));
+        return;
+      }
+
+      const bookmarks = getUserBookmarks(currentUser.id);
+
+      if (bookmarks.length === 0) {
+        container.innerHTML = '';
+        container.appendChild(createEmptyState({
+          type: 'bookmarks',
+          actionText: '探索作品',
+          onAction: () => window.location.href = '/search/'
+        }));
+        return;
+      }
+
+      container.innerHTML = '<div id="bookmarksGrid" class="novels-grid"></div>';
+      const grid = container.querySelector('#bookmarksGrid');
+
+      bookmarks.forEach(bm => {
+        if (bm.novel) {
+          const card = createNovelCard(bm.novel, {
+            showAuthor: true,
+            onClick: () => window.location.href = `/novel/${bm.novel.slug}.html`
+          });
+          grid.appendChild(card);
+        }
+      });
+    }
+
+    // Render about tab
+    function renderAboutTab(container) {
+      container.innerHTML = `
+        <div class="about-section">
+          <h2 class="about-section__title">关于我</h2>
+          <div class="about-section__content">
+            ${profileUser.bio
+              ? `<p class="about-bio">${profileUser.bio.replace(/\n/g, '<br>')}</p>`
+              : '<p class="about-empty">这位作者还没有添加简介</p>'
+            }
+          </div>
+        </div>
+
+        <div class="about-section">
+          <h2 class="about-section__title">创作偏好</h2>
+          <div class="about-tags">
+            ${profileUser.tags && profileUser.tags.length > 0
+              ? profileUser.tags.map(tag => `<span class="tag">${tag}</span>`).join('')
+              : '<p class="about-empty">暂无标签</p>'
+            }
+          </div>
+        </div>
+
+        ${profileUser.location || profileUser.website ? `
+          <div class="about-section">
+            <h2 class="about-section__title">联系方式</h2>
+            <div class="about-links">
+              ${profileUser.location ? `
+                <div class="about-link">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span>${profileUser.location}</span>
+                </div>
+              ` : ''}
+              ${profileUser.website ? `
+                <a href="${profileUser.website}" class="about-link" target="_blank" rel="noopener">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                  <span>${profileUser.website}</span>
+                </a>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="about-section">
+          <h2 class="about-section__title">统计数据</h2>
+          <div class="about-stats">
+            <div class="about-stat">
+              <span class="about-stat__value">${userNovels.length}</span>
+              <span class="about-stat__label">作品</span>
+            </div>
+            <div class="about-stat">
+              <span class="about-stat__value">${userNovels.reduce((sum, n) => sum + n.wordCount, 0).toLocaleString()}</span>
+              <span class="about-stat__label">累计字数</span>
+            </div>
+            <div class="about-stat">
+              <span class="about-stat__value">${userNovels.reduce((sum, n) => sum + n.views, 0).toLocaleString()}</span>
+              <span class="about-stat__label">总阅读</span>
+            </div>
+            <div class="about-stat">
+              <span class="about-stat__value">${userNovels.reduce((sum, n) => sum + n.bookmarks, 0).toLocaleString()}</span>
+              <span class="about-stat__label">总收藏</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <p class="about-joined">加入于 ${profileUser.joinedAt}</p>
+        </div>
+      `;
+    }
+
+    // Handle edit
+    function handleEdit(type) {
+      toast.info('编辑功能开发中');
+    }
+
+    // Initialize
+    initHeader();
+    loadProfile();
+  </script>
+</body>
+</html>

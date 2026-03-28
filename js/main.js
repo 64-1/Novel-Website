@@ -20,6 +20,8 @@ import { initSiteSearch } from "./modules/SiteSearch.js";
 import { initTrendingSection } from "./modules/TrendingSection.js";
 import { initServiceWorkerUpdates } from "./modules/ServiceWorkerUpdates.js";
 import { initContinueReading } from "./modules/ContinueReading.js";
+import { createUserAvatarMenu } from "./components/UserAvatarMenu.js";
+import { initAuthGuards } from "./modules/AuthGuard.js";
 
 const stores = {
   ReaderSettingsStore,
@@ -58,6 +60,23 @@ document.addEventListener("DOMContentLoaded", () => {
   initSiteSearch(Strings?.search || {});
   initTrendingSection();
   initContinueReading();
+  initAuthGuards();
+
+  // Initialize header auth menu
+  const headerAuth = document.getElementById('headerAuth');
+  if (headerAuth) {
+    createUserAvatarMenu({
+      container: headerAuth,
+      onNavigate: (action, href) => {
+        if (action === 'logout') {
+          // Refresh the page after logout
+          window.location.reload();
+        } else if (href) {
+          window.location.href = href;
+        }
+      }
+    });
+  }
 });
 
 initServiceWorkerUpdates(Strings?.updates || {});
